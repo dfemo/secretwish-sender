@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus, Sparkles, Star } from "lucide-react";
-import { api, useApi, useMutation } from "@/shared/lib/api";
+import { api, useMutation, usePagedApi } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { date, timeAgo } from "@/shared/lib/format";
-import { Badge, Button, Card, cx, EmptyState, ErrorState, Field, Input, Notice, PageHeader, Select, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
+import { Badge, Button, Card, cx, EmptyState, ErrorState, Field, Input, Notice, PageHeader, SearchInput, Select, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { Modal, useToast } from "@/shared/ui/overlay";
 
 type Surprise = {
@@ -17,7 +18,7 @@ type Surprise = {
 const empty = { title: "", categoryId: "", budgetMin: "", budgetMax: "", recipientName: "", deliveryCity: "Lagos", neededBy: "", notes: "" };
 
 export default function SurprisesPage() {
-  const { data, error, loading, reload } = useApi<Surprise[]>("/sender/surprises");
+  const { data: paged, items: data, error, loading, reload, setPage, search, setSearch } = usePagedApi<Surprise>("/sender/surprises", {}, 10);
   const { fmt, meta } = useSession();
   const router = useRouter();
   const toast = useToast();
@@ -54,9 +55,15 @@ export default function SurprisesPage() {
         description="Describe the moment and set a budget range. Approved vendors quote within it — anything outside your range is clearly flagged."
         actions={<Button icon={Plus} onClick={() => setOpen(true)}>New surprise request</Button>}
       />
+      <SearchInput value={search} onChange={setSearch} label="Search surprise requests" placeholder="Search by title or reference" className="mb-5 sm:w-80" />
       {loading && <Spinner />}
       {error && <ErrorState error={error} onRetry={reload} />}
-      {data?.length === 0 && <EmptyState icon={Sparkles} title="No surprise requests yet" description="Not sure what to buy? Let vendors pitch ideas within your budget." action={<Button onClick={() => setOpen(true)}>Start one</Button>} />}
+      {data?.length === 0 &&
+        (search ? (
+          <EmptyState icon={Sparkles} title="No surprise requests match your search" />
+        ) : (
+          <EmptyState icon={Sparkles} title="No surprise requests yet" description="Not sure what to buy? Let vendors pitch ideas within your budget." action={<Button onClick={() => setOpen(true)}>Start one</Button>} />
+        ))}
       <ul className="space-y-5">
         {data?.map((s) => (
           <li key={s.id}>
@@ -112,6 +119,7 @@ export default function SurprisesPage() {
           </li>
         ))}
       </ul>
+      <PagedFooter data={paged} onPage={setPage} className="mt-4 rounded-2xl border bg-white" />
 
       <Modal
         open={open}

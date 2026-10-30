@@ -3,17 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Gift, Link2 } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { usePagedApi } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
 import { Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SearchInput, Skeleton } from "@/shared/ui/primitives";
 import { WishlistTile } from "@/components/wishlist-tile";
 import type { WishlistCard } from "@/lib/types";
 
 export default function WishlistsPage() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
   const [link, setLink] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
-  const { data, error, loading, reload } = useApi<WishlistCard[]>(`/sender/wishlists/discover?search=${encodeURIComponent(search)}`);
+  const { data: paged, items: data, error, loading, reload, setPage, search, setSearch } = usePagedApi<WishlistCard>("/sender/wishlists/discover", {}, 12);
 
   const openLink = () => {
     const token = link.trim().split("/w/").pop()?.split(/[?#]/)[0]?.trim();
@@ -64,6 +64,7 @@ export default function WishlistsPage() {
           </li>
         ))}
       </ul>
+      <PagedFooter data={paged} onPage={setPage} className="mt-4 rounded-2xl border bg-white" />
     </>
   );
 }

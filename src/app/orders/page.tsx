@@ -3,39 +3,46 @@
 import Link from "next/link";
 import { useState } from "react";
 import { PackageOpen } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { usePagedApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
-import { ButtonLink, Card, EmptyState, ErrorState, PageHeader, ProductArt, Spinner, StatusBadge, Tabs } from "@/shared/ui/primitives";
+import { ButtonLink, Card, EmptyState, ErrorState, PageHeader, ProductArt, SearchInput, Spinner, StatusBadge, Tabs } from "@/shared/ui/primitives";
+import { PagedFooter } from "@/shared/ui/data";
 
 type Row = { id: string; reference: string; createdAt: string; status: string; paymentStatus: string; total: number; recipientName: string; deliveryCity: string; deliveryDate: string; product: string; emoji: string; vendor: string; deliveryStatus: string };
 
-const closed = ["Delivered", "Cancelled", "RefundCompleted"];
-
 export default function OrdersPage() {
-  const { data, error, loading, reload } = useApi<Row[]>("/sender/orders");
   const [tab, setTab] = useState<"active" | "done" | "all">("active");
+  const { data, items, error, loading, reload, setPage, search, setSearch } = usePagedApi<Row>("/sender/orders", { tab });
   const { fmt } = useSession();
-  const rows = data?.filter((o) => (tab === "all" ? true : tab === "active" ? !closed.includes(o.status) : closed.includes(o.status))) ?? [];
 
   return (
     <>
       <PageHeader title="My gifts" description="Track every surprise you've sent. Updates never reveal the gift to the recipient." />
-      <Tabs
-        className="mb-5 w-fit"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: "active", label: "In progress", count: data?.filter((o) => !closed.includes(o.status)).length },
-          { value: "done", label: "Completed", count: data?.filter((o) => closed.includes(o.status)).length },
-          { value: "all", label: "All" },
-        ]}
-      />
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs
+          className="w-fit"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: "active", label: "In progress", count: data?.counts?.active },
+            { value: "done", label: "Completed", count: data?.counts?.done },
+            { value: "all", label: "All" },
+          ]}
+        />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by gift, recipient or order number" label="Search my gifts" className="sm:w-80" />
+      </div>
       {loading && <Spinner />}
       {error && <ErrorState error={error} onRetry={reload} />}
-      {data && rows.length === 0 && <EmptyState icon={PackageOpen} title={tab === "active" ? "No gifts in progress" : "Nothing here yet"} action={<ButtonLink href="/browse">Find a gift</ButtonLink>} />}
+      {items && items.length === 0 && (
+        <EmptyState
+          icon={PackageOpen}
+          title={search ? "No gifts match your search" : tab === "active" ? "No gifts in progress" : "Nothing here yet"}
+          action={search ? undefined : <ButtonLink href="/browse">Find a gift</ButtonLink>}
+        />
+      )}
       <ul className="space-y-3">
-        {rows.map((o) => (
+        {items?.map((o) => (
           <li key={o.id}>
             <Link href={`/orders/${o.id}`} className="block">
               <Card className="flex flex-wrap items-center gap-4 p-4 transition hover:shadow-[var(--shadow-pop)]">
@@ -56,6 +63,7 @@ export default function OrdersPage() {
           </li>
         ))}
       </ul>
+      <PagedFooter data={data} onPage={setPage} className="mt-4 rounded-2xl border bg-white" />
     </>
   );
 }

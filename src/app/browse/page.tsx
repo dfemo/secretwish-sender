@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SearchX, SlidersHorizontal } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { useApi, type Paged } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { Button, cx, EmptyState, ErrorState, Field, Input, PageHeader, SearchInput, Select, Skeleton, Spinner } from "@/shared/ui/primitives";
 import { ProductCard } from "@/components/product-card";
@@ -24,8 +25,11 @@ function BrowseInner() {
     return () => clearTimeout(t);
   }, [search]);
   const priceError = min && max && Number(min) > Number(max) ? "Min must be below max." : null;
-  const qs = new URLSearchParams({ search: debounced, sort, ...(category ? { categoryId: category } : {}), ...(!priceError && min ? { min } : {}), ...(!priceError && max ? { max } : {}) });
-  const { data, error, loading, reload } = useApi<Product[]>(`/catalog/products?${qs}`);
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [debounced, sort, category, min, max]);
+  const qs = new URLSearchParams({ search: debounced, sort, page: String(page), pageSize: "24", ...(category ? { categoryId: category } : {}), ...(!priceError && min ? { min } : {}), ...(!priceError && max ? { max } : {}) });
+  const { data: paged, error, loading, reload } = useApi<Paged<Product>>(`/catalog/products?${qs}`);
+  const data = paged?.items;
   const { fmt } = useSession();
 
   return (
@@ -84,7 +88,7 @@ function BrowseInner() {
       {data && data.length > 0 && (
         <>
           <p className="mb-3 text-xs text-ink-500" aria-live="polite">
-            {data.length} gift{data.length === 1 ? "" : "s"}
+            {paged!.total.toLocaleString()}{paged!.totalCapped ? "+" : ""} gift{paged!.total === 1 ? "" : "s"}
           </p>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
             {data.map((p) => (
@@ -93,6 +97,7 @@ function BrowseInner() {
               </li>
             ))}
           </ul>
+          <PagedFooter data={paged} onPage={setPage} className="mt-6 rounded-2xl border bg-white" />
         </>
       )}
     </>

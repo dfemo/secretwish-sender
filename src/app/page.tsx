@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Gift, Search, Sparkles, Truck } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { useApi, type Paged } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
 import { ButtonLink, Card, ErrorState, PageSkeleton, ProductArt, StatusBadge, cx } from "@/shared/ui/primitives";
@@ -23,16 +23,17 @@ type Home = {
 
 export default function SenderHome() {
   const { data, error, loading, reload } = useApi<Home>("/sender/home");
-  const { data: catalog } = useApi<Product[]>("/catalog/products");
   const { meta, fmt } = useSession();
   const router = useRouter();
   const [q, setQ] = useState("");
   const [viewed, setViewed] = useState<string[]>([]);
   useEffect(() => setViewed(recentlyViewed()), []);
+  // Fetch only the recently viewed gifts, not the whole catalogue.
+  const { data: catalog } = useApi<Paged<Product>>(viewed.length ? `/catalog/products?ids=${viewed.join(",")}` : null);
 
   if (loading) return <PageSkeleton />;
   if (error || !data) return <ErrorState error={error} onRetry={reload} />;
-  const recent = viewed.map((id) => catalog?.find((p) => p.id === id)).filter(Boolean) as Product[];
+  const recent = viewed.map((id) => catalog?.items.find((p) => p.id === id)).filter(Boolean) as Product[];
 
   return (
     <div className="space-y-12">
