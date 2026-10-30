@@ -14,7 +14,7 @@ import type { Product } from "@/lib/types";
 
 type Pricing = { unit: number; qty: number; subtotal: number; deliveryFee: number; discount: number; tax: number; total: number; freeSample: boolean; planRequired: boolean; promoMessage?: string };
 type SharedWl = { title: string; token: string; owner: { firstName: string; city: string }; items: { id: string; notes: string; quantity: number }[] };
-type Surprise = { id: string; title: string; budgetMin: number; budgetMax: number; recipientName: string; deliveryCity: string; quotes: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; vendor: { name: string } }[] };
+type Surprise = { id: string; title: string; items: { id: string; name: string; emoji: string; quantity: number; notes: string }[]; budgetMin: number; budgetMax: number; recipientName: string; deliveryCity: string; wishlistToken?: string | null; wishlistItemId?: string | null; quotes: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; vendor: { name: string } }[] };
 
 const steps = ["Gift", "Recipient", "Message", "Privacy", "Payment", "Review"] as const;
 const cities = ["Lagos", "Abuja", "Port Harcourt", "Ibadan", "Enugu", "Kano"];
@@ -23,15 +23,18 @@ function CheckoutInner() {
   const params = useSearchParams();
   const productId = params.get("product");
   const quoteId = params.get("quote");
-  const wlToken = params.get("wl");
-  const itemId = params.get("item");
+  const wlParam = params.get("wl");
+  const itemParam = params.get("item");
   const { fmt, meta } = useSession();
   const toast = useToast();
 
   const product = useApi<{ product: Product }>(productId ? `/catalog/products/${productId}` : null);
+  const surprises = useApi<Surprise>(quoteId ? `/sender/quotes/${quoteId}` : null);
+  const request = surprises.data;
+  // A quote that sources someone's wish delivers to that wishlist's owner, just like gifting from the list directly.
+  const wlToken = wlParam ?? request?.wishlistToken ?? null;
+  const itemId = itemParam ?? request?.wishlistItemId ?? null;
   const wishlist = useApi<SharedWl>(wlToken ? `/sender/wishlists/shared/${wlToken}` : null);
-  const surprises = useApi<Surprise[]>(quoteId ? `/sender/surprises` : null);
-  const request = surprises.data?.find((s) => s.quotes.some((q) => q.id === quoteId));
   const quote = request?.quotes.find((q) => q.id === quoteId);
   const p = product.data?.product;
   const wlItem = wishlist.data?.items.find((i) => i.id === itemId);
@@ -213,6 +216,23 @@ function CheckoutInner() {
                     <Field label="Max (USD)">{(id) => <Input id={id} type="number" min={0} value={f.budgetMax} onChange={(e) => set("budgetMax", e.target.value)} />}</Field>
                   </div>
                 </fieldset>
+              )}
+              {quote && request!.items.length > 1 && (
+                <div>
+                  <p className="mb-2 text-[13px] font-semibold text-ink-700">{quote.vendor.name} supplies all {request!.items.length} items</p>
+                  <ul className="divide-y divide-ink-100 rounded-2xl border border-ink-200">
+                    {request!.items.map((i) => (
+                      <li key={i.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                        <span aria-hidden>{i.emoji}</span>
+                        <span className="min-w-0 flex-1">
+                          {i.name}
+                          {i.notes && <span className="block truncate text-xs text-ink-500">{i.notes}</span>}
+                        </span>
+                        <span className="text-xs text-ink-500 tabular">× {i.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {quote && (
                 <Notice tone={quote.overBudget ? "warning" : "success"} title={quote.overBudget ? "This quote is outside your budget" : "Within your budget"}>

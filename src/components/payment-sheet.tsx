@@ -12,16 +12,16 @@ import { Modal } from "@/shared/ui/overlay";
  * widget (e.g. Paystack Popup); card data never touches SecretWish servers or this front end,
  * and the order is confirmed only by a server-side webhook.
  */
-export function PaymentSheet({ order, method, onClose, onPaid }: { order: { id: string; reference: string; total: number } | null; method: string; onClose: () => void; onPaid: () => void }) {
+export function PaymentSheet({ order, method, onClose, onPaid, payPath }: { order: { id: string; reference: string; total: number } | null; method: string; onClose: () => void; onPaid: () => void; /** Defaults to the order's pay endpoint; cash gifts pass their own. */ payPath?: string }) {
   const { fmt, currency, meta } = useSession();
   const [failure, setFailure] = useState<string | null>(null);
-  const pay = useMutation((outcome: "success" | "fail") => api<{ status: string; reason?: string }>(`/sender/orders/${order!.id}/pay`, { method: "POST", body: { outcome } }));
+  const pay = useMutation((outcome: "success" | "fail") => api<{ status: string; reason?: string }>(payPath ?? `/sender/orders/${order!.id}/pay`, { method: "POST", body: { outcome } }));
 
   const attempt = async (outcome: "success" | "fail") => {
     setFailure(null);
     const r = await pay.run(outcome);
     if (!r) return;
-    if (r.status === "PaymentConfirmed") onPaid();
+    if (r.status !== "PaymentFailed") onPaid();
     else setFailure(r.reason ?? "Payment was declined.");
   };
 

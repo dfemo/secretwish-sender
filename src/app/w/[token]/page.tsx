@@ -2,24 +2,26 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CalendarHeart, CheckCircle2, Gift, Lock, MapPin } from "lucide-react";
+import { useState } from "react";
+import { Banknote, CalendarHeart, CheckCircle2, ExternalLink, Gift, Lock, MapPin, Sparkles } from "lucide-react";
 import { useApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
 import { Badge, ButtonLink, cx, EmptyState, ErrorState, PageSkeleton, ProductArt } from "@/shared/ui/primitives";
+import { SendCashModal, SourceWishModal, type SharedWish } from "@/components/wish-actions";
 
 type Shared = {
   id: string; title: string; description: string; occasion: string; eventDate: string; visibility: string; token: string;
   owner: { firstName: string; city: string };
-  items: { id: string; priority: number; notes: string; quantity: number; fulfilled: boolean; category: string; product: { id: string; name: string; priceUsd: number; emoji: string; tint: string; available: boolean; vendor: string } | null }[];
+  items: SharedWish[];
 };
-
-const priority = { 1: { label: "Top wish", tone: "gold" as const }, 2: { label: "Would love", tone: "plum" as const }, 3: { label: "Nice to have", tone: "neutral" as const } };
 
 export default function SharedWishlistPage() {
   const { token } = useParams<{ token: string }>();
   const { data, error, loading, reload } = useApi<Shared>(`/sender/wishlists/shared/${token}`);
   const { fmt } = useSession();
+  const [sourcing, setSourcing] = useState<SharedWish | null>(null);
+  const [cash, setCash] = useState<SharedWish | "any" | null>(null);
   if (loading) return <PageSkeleton />;
   if (error?.status === 404)
     return <EmptyState icon={Lock} title="This wishlist isn't available" description="The link may have been changed by its owner, or the list is now private. Ask them for a fresh link." action={<ButtonLink href="/wishlists">Back to wishlists</ButtonLink>} />;
@@ -51,43 +53,68 @@ export default function SharedWishlistPage() {
         <Lock className="size-4 shrink-0" aria-hidden /> {data.owner.firstName}&apos;s address stays private. We deliver to it for you — you&apos;ll only see the city.
       </p>
       <ul className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4">
-        {data.items.map((it) => {
+        {data.items.map((it, index) => {
           const p = it.product;
-          if (!p) return null;
-          const pr = priority[it.priority as 1 | 2 | 3];
-          const giftable = !it.fulfilled && p.available;
+          const giftable = !it.fulfilled && (it.kind !== "Catalog" || !!p?.available);
+          const price = p?.priceUsd ?? it.cashAmountUsd ?? it.estimatedPriceUsd;
           return (
             <li key={it.id} className={cx(it.fulfilled && "opacity-70")}>
               <div className="relative">
-                <ProductArt emoji={p.emoji} tint={p.tint} size="lg" label={p.name} />
+                {p ? (
+                  <ProductArt emoji={p.emoji} tint={p.tint} size="lg" label={p.name} />
+                ) : it.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={it.imageUrl} alt={it.name} referrerPolicy="no-referrer" className="aspect-square w-full rounded-2xl object-cover" />
+                ) : (
+                  <ProductArt emoji={it.kind === "Cash" ? "💸" : "🎁"} tint={it.kind === "Cash" ? "sage" : "lavender"} size="lg" label={it.name} />
+                )}
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                   {it.fulfilled ? (
-                    <Badge tone="success" icon={CheckCircle2}>
-                      Gifted
-                    </Badge>
-                  ) : (
-                    <Badge tone={pr.tone}>{pr.label}</Badge>
-                  )}
-                  {!p.available && !it.fulfilled && <Badge tone="warning">Unavailable</Badge>}
+                    <Badge tone="success" icon={CheckCircle2}>Gifted</Badge>
+                  ) : index === 0 ? (
+                    <Badge tone="gold">★ Most wanted</Badge>
+                  ) : null}
+                  {it.kind === "Cash" && !it.fulfilled && <Badge tone="plum">Cash</Badge>}
+                  {p && !p.available && !it.fulfilled && <Badge tone="warning">Unavailable</Badge>}
                 </div>
               </div>
-              <p className="mt-2.5 line-clamp-1 text-sm font-semibold">{p.name}</p>
-              <p className="text-xs text-ink-500">{p.vendor}</p>
+              <p className="mt-2.5 line-clamp-2 text-sm font-semibold">{it.name}</p>
+              <p className="text-xs text-ink-500">
+                {p ? p.vendor : it.kind === "Custom" ? "From another shop · vendors source it" : `${data.owner.firstName} would love cash`}
+              </p>
+              {it.url && (
+                <a href={it.url} target="_blank" rel="noopener noreferrer nofollow" className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-plum-700 hover:underline">
+                  <ExternalLink className="size-3" aria-hidden /> See it on {new URL(it.url).hostname.replace(/^www\./, "")}
+                </a>
+              )}
               {it.notes && <p className="mt-1 text-xs text-ink-700 italic">“{it.notes}”</p>}
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-sm font-bold tabular">{fmt(p.priceUsd)}</span>
-                {giftable ? (
-                  <Link href={`/checkout?product=${p.id}&wl=${data.token}&item=${it.id}`} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
+                <span className="text-sm font-bold tabular">{price != null ? `${it.kind === "Custom" ? "~" : ""}${fmt(price)}` : ""}</span>
+                {!giftable ? (
+                  <span className="text-xs text-ink-400">{it.fulfilled ? "Already gifted" : "Not available"}</span>
+                ) : it.kind === "Catalog" ? (
+                  <Link href={`/checkout?product=${p!.id}&wl=${data.token}&item=${it.id}`} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
                     <Gift className="size-3.5" aria-hidden /> Gift this
                   </Link>
+                ) : it.kind === "Cash" ? (
+                  <button type="button" onClick={() => setCash(it)} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
+                    <Banknote className="size-3.5" aria-hidden /> Send cash
+                  </button>
                 ) : (
-                  <span className="text-xs text-ink-400">{it.fulfilled ? "Already gifted" : "Not available"}</span>
+                  <button type="button" onClick={() => setSourcing(it)} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
+                    <Sparkles className="size-3.5" aria-hidden /> Get quotes
+                  </button>
                 )}
               </div>
             </li>
           );
         })}
       </ul>
+      <p className="mt-10 text-center text-sm text-ink-500">
+        Not sure what to pick? <button type="button" className="font-semibold text-plum-700 underline" onClick={() => setCash("any")}>Send {data.owner.firstName} cash instead</button>
+      </p>
+      {sourcing && <SourceWishModal token={data.token} wish={sourcing} ownerName={data.owner.firstName} onClose={() => setSourcing(null)} />}
+      {cash && <SendCashModal token={data.token} wish={cash === "any" ? null : cash} ownerName={data.owner.firstName} onClose={() => { setCash(null); reload(); }} />}
     </>
   );
 }
