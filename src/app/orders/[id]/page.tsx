@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, CreditCard, LifeBuoy, MapPin, RotateCcw, Truck, XCircle } from "lucide-react";
+import { ArrowLeft, CreditCard, LifeBuoy, MapPin, PackageCheck, RotateCcw, ThumbsUp, Truck, XCircle } from "lucide-react";
 import { useApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date, dateTime } from "@/shared/lib/format";
@@ -11,6 +11,7 @@ import { Button, ButtonLink, Card, ErrorState, Notice, PageSkeleton, ProductArt,
 import { Timeline, type TimelineItem } from "@/shared/ui/data";
 import { OrderActionDialog } from "@/shared/ui/order-actions";
 import { PaymentSheet } from "@/components/payment-sheet";
+import { InviteRecipient } from "@/components/invite-recipient";
 import type { SenderOrder } from "@/lib/types";
 
 // The customer-facing journey. Completed steps come from real events; the rest show what's next.
@@ -24,7 +25,7 @@ const journey = [
 
 export default function OrderTracking() {
   const { id } = useParams<{ id: string }>();
-  const { data: o, error, loading, reload } = useApi<SenderOrder>(`/sender/orders/${id}`);
+  const { data: o, error, loading, reload, setData } = useApi<SenderOrder>(`/sender/orders/${id}`);
   const { fmt } = useSession();
   const [action, setAction] = useState<{ key: string; label: string } | null>(null);
   const [paying, setPaying] = useState(false);
@@ -33,7 +34,9 @@ export default function OrderTracking() {
 
   const happy = journey.map<TimelineItem>((j) => {
     const e = [...o.events].reverse().find((x) => x.type === j.type);
-    return { id: j.type, at: e?.at ?? "", title: e && j.type === "dispatched" && o.delivery.courier ? `Picked up by ${o.delivery.courier}` : j.title, detail: e ? e.detail : j.next, done: !!e };
+    // Recipients not on SecretWish can't confirm with a code, so the sender marks the gift received.
+    const next = j.type === "delivered" && !o.recipient.onSecretWish && !o.recipient.viaWishlist ? "Mark it as received once they have it." : j.next;
+    return { id: j.type, at: e?.at ?? "", title: e && j.type === "dispatched" && o.delivery.courier ? `Picked up by ${o.delivery.courier}` : j.title, detail: e ? e.detail : next, done: !!e };
   });
   // Off-path events (failures, exceptions, refunds) are shown in order after the main journey.
   const extra = o.events.filter((e) => !journey.some((j) => j.type === e.type) && e.type !== "sent_to_vendor").map<TimelineItem>((e) => ({ id: e.id, at: e.at, title: e.title, detail: e.detail, done: true }));
@@ -62,6 +65,13 @@ export default function OrderTracking() {
               Complete payment
             </Button>
           </div>
+        </Notice>
+      )}
+      {o.status === "Delivered" && (
+        <Notice className="mb-6" tone={o.delivery.senderApprovedAt ? "success" : "info"} title={o.delivery.senderApprovedAt ? "Thanks for confirming" : "Did it arrive as expected?"}>
+          {o.delivery.senderApprovedAt
+            ? `You confirmed you were happy with this gift on ${date(o.delivery.senderApprovedAt)}, so ${o.vendor.name} can be paid.`
+            : `If you're happy with the gift, confirm it below so ${o.vendor.name} can be paid now rather than after the usual hold period. If something's wrong, report a problem instead.`}
         </Notice>
       )}
       {o.status === "DeliveryException" && (
@@ -131,9 +141,15 @@ export default function OrderTracking() {
               Payment <StatusBadge status={o.paymentStatus} />
             </p>
           </div>
+          <InviteRecipient order={o} onSent={setData} />
           <div className="flex flex-wrap gap-2">
             {o.actions.map((a) => (
-              <Button key={a.key} variant="secondary" icon={a.key === "cancel" ? XCircle : RotateCcw} onClick={() => setAction(a)}>
+              <Button
+                key={a.key}
+                variant={a.key === "confirm-received" || a.key === "confirm-satisfied" ? "primary" : "secondary"}
+                icon={a.key === "cancel" ? XCircle : a.key === "confirm-received" ? PackageCheck : a.key === "confirm-satisfied" ? ThumbsUp : RotateCcw}
+                onClick={() => setAction(a)}
+              >
                 {a.key === "request-refund" ? "Report a problem / refund" : a.label}
               </Button>
             ))}

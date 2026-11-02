@@ -14,7 +14,7 @@ import type { Product } from "@/lib/types";
 
 type Pricing = { unit: number; qty: number; subtotal: number; deliveryFee: number; discount: number; tax: number; total: number; freeSample: boolean; planRequired: boolean; promoMessage?: string };
 type SharedWl = { title: string; token: string; owner: { firstName: string; city: string }; items: { id: string; notes: string; quantity: number }[] };
-type Surprise = { id: string; title: string; items: { id: string; name: string; emoji: string; quantity: number; notes: string }[]; budgetMin: number; budgetMax: number; recipientName: string; deliveryCity: string; wishlistToken?: string | null; wishlistItemId?: string | null; quotes: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; vendor: { name: string } }[] };
+type Surprise = { id: string; title: string; items: { id: string; name: string; emoji: string; quantity: number; notes: string }[]; budgetMin: number; budgetMax: number; recipientName: string; recipientEmail?: string | null; deliveryCity: string; wishlistToken?: string | null; wishlistItemId?: string | null; quotes: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; vendor: { name: string } }[] };
 
 const steps = ["Gift", "Recipient", "Message", "Privacy", "Payment", "Review"] as const;
 const cities = ["Lagos", "Abuja", "Port Harcourt", "Ibadan", "Enugu", "Kano"];
@@ -42,7 +42,7 @@ function CheckoutInner() {
   const [step, setStep] = useState(0);
   const [f, setF] = useState({
     quantity: 1, personalisation: "", budgetMin: "", budgetMax: "",
-    recipientName: "", recipientPhone: "", deliveryAddress: "", deliveryCity: "Lagos", deliveryOption: "Standard", deliveryDate: "",
+    recipientName: "", recipientPhone: "", recipientEmail: "", deliveryAddress: "", deliveryCity: "Lagos", deliveryOption: "Standard", deliveryDate: "",
     giftMessage: "", revealSender: false, hidePrice: true, discreetPackaging: true, method: "Card", promoCode: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -57,7 +57,7 @@ function CheckoutInner() {
     if (wlItem) set("quantity", wlItem.quantity);
   }, [wlItem]);
   useEffect(() => {
-    if (request) setF((x) => ({ ...x, recipientName: request.recipientName, deliveryCity: request.deliveryCity }));
+    if (request) setF((x) => ({ ...x, recipientName: request.recipientName, recipientEmail: request.recipientEmail ?? "", deliveryCity: request.deliveryCity }));
   }, [request]);
   const options = useMemo(() => (p ? p.deliveryOptions : ["Standard", "Express"]), [p]);
   useEffect(() => {
@@ -81,7 +81,7 @@ function CheckoutInner() {
       method: "POST",
       body: {
         productId: quoteId ? null : productId, quoteId, quantity: f.quantity, wishlistToken: wlToken, wishlistItemId: itemId,
-        recipientName: f.recipientName, recipientPhone: f.recipientPhone, deliveryAddress: f.deliveryAddress, deliveryCity: f.deliveryCity,
+        recipientName: f.recipientName, recipientPhone: f.recipientPhone, recipientEmail: f.recipientEmail.trim() || null, deliveryAddress: f.deliveryAddress, deliveryCity: f.deliveryCity,
         deliveryDate: f.deliveryDate || null, deliveryOption: f.deliveryOption, giftMessage: f.giftMessage, personalisation: f.personalisation,
         revealSender: f.revealSender, discreetPackaging: f.discreetPackaging, hidePrice: f.hidePrice, promoCode: f.promoCode,
         budgetMin: f.budgetMin ? Number(f.budgetMin) : null, budgetMax: f.budgetMax ? Number(f.budgetMax) : null,
@@ -260,6 +260,9 @@ function CheckoutInner() {
                   </Field>
                   <Field label="Recipient's phone" required hint="Only shared with the vendor and courier." error={errors.recipientPhone ?? serverErrors?.recipientPhone?.[0]}>
                     {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.recipientPhone} type="tel" autoComplete="off" value={f.recipientPhone} onChange={(e) => set("recipientPhone", e.target.value)} placeholder="+234 …" />}
+                  </Field>
+                  <Field label="Recipient's email (optional)" className="sm:col-span-2" hint="If they're not on SecretWish, you can invite them to join once the gift is delivered. Never shared with the vendor." error={serverErrors?.recipientEmail?.[0]}>
+                    {(id, d) => <Input id={id} aria-describedby={d} type="email" autoComplete="off" value={f.recipientEmail} onChange={(e) => set("recipientEmail", e.target.value)} placeholder="name@example.com" />}
                   </Field>
                   <Field label="Delivery address" required className="sm:col-span-2" error={errors.deliveryAddress ?? serverErrors?.deliveryAddress?.[0]}>
                     {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.deliveryAddress} autoComplete="off" value={f.deliveryAddress} onChange={(e) => set("deliveryAddress", e.target.value)} placeholder="House number, street, area" />}

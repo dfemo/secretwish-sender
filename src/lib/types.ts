@@ -41,9 +41,13 @@ export type SenderOrder = {
   vendor: { id: string; name: string };
   lines: { productName: string; emoji: string; quantity: number; unitPrice: number; customisation: string; total: number }[];
   money: { subtotal: number; deliveryFee: number; tax: number; discount: number; total: number; fxRateNgn: number };
-  recipient: { name: string; address: string; city: string; viaWishlist: boolean };
+  recipient: {
+    name: string; address: string; city: string; viaWishlist: boolean;
+    /** For recipients not on SecretWish: their email (if given), when they were last invited, and why an invite can't be sent now. */
+    email: string | null; onSecretWish: boolean; invitedAt: string | null; inviteBlocked: string | null;
+  };
   gift: { giftMessage: string; personalisation: string; revealSender: boolean; discreetPackaging: boolean; hidePriceFromRecipient: boolean; budgetMin: number; budgetMax: number };
-  delivery: { deliveryOption: string; deliveryDate: string | null; trackingReference: string | null; courier: string | null; deliveredAt: string | null };
+  delivery: { deliveryOption: string; deliveryDate: string | null; trackingReference: string | null; courier: string | null; deliveredAt: string | null; senderApprovedAt: string | null };
   events: OrderEvent[];
   actions: { key: string; label: string }[];
 };

@@ -38,7 +38,7 @@ const quickItems: { name: string; slug: string }[] = [
 
 let nextKey = 1;
 const newItem = (name = "", categoryId = ""): ItemDraft => ({ key: nextKey++, name, categoryId, quantity: "1", notes: "" });
-const empty = { title: "", budgetMin: "", budgetMax: "", recipientName: "", deliveryCity: "Lagos", neededBy: "", notes: "" };
+const empty = { title: "", budgetMin: "", budgetMax: "", recipientName: "", recipientEmail: "", deliveryCity: "Lagos", neededBy: "", notes: "" };
 
 export default function SurprisesPage() {
   const { data: paged, items: data, error, loading, reload, setPage, search, setSearch } = usePagedApi<Surprise>("/sender/surprises", {}, 10);
@@ -64,6 +64,7 @@ export default function SurprisesPage() {
         budgetMin: Number(form.budgetMin),
         budgetMax: Number(form.budgetMax),
         neededBy: form.neededBy || null,
+        recipientEmail: form.recipientEmail.trim() || null,
         items: filled.map((i) => ({ name: i.name.trim(), categoryId: i.categoryId || categories[0]?.id, quantity: Number(i.quantity) || 1, notes: i.notes.trim() || null })),
       },
     }),
@@ -92,6 +93,7 @@ export default function SurprisesPage() {
     if (!(Number(form.budgetMin) > 0)) e.budgetMin = "Enter your minimum budget.";
     if (!(Number(form.budgetMax) >= Number(form.budgetMin))) e.budgetMax = "Must be at least the minimum.";
     if (!form.recipientName.trim()) e.recipientName = "Who is it for?";
+    if (form.recipientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.recipientEmail.trim())) e.recipientEmail = "Enter a valid email, or leave it blank.";
     setErrors(e);
     if (Object.keys(e).length) return;
     const r = await create.run();
@@ -272,6 +274,9 @@ export default function SurprisesPage() {
           </Field>
           <Field label="Recipient's first name" required error={errors.recipientName}>
             {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.recipientName} value={form.recipientName} onChange={(e) => setForm({ ...form, recipientName: e.target.value })} />}
+          </Field>
+          <Field label="Recipient's email (optional)" error={errors.recipientEmail ?? create.error?.errors?.recipientEmail?.[0]} hint="If they're not on SecretWish, you can invite them after delivery. Vendors never see it.">
+            {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.recipientEmail} type="email" autoComplete="off" value={form.recipientEmail} onChange={(e) => setForm({ ...form, recipientEmail: e.target.value })} placeholder="name@example.com" />}
           </Field>
           <Field label="City">
             {(id) => (
