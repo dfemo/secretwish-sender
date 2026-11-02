@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, useMutation } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
+import { currencySymbol } from "@/shared/lib/format";
 import { Button, Field, Input, Notice, Select, Switch, Textarea } from "@/shared/ui/primitives";
 import { Modal, useToast } from "@/shared/ui/overlay";
 import { PaymentSheet } from "@/components/payment-sheet";
@@ -14,12 +15,12 @@ export type SharedWish = {
   product: { id: string; name: string; priceUsd: number; emoji: string; tint: string; available: boolean; vendor: string } | null;
 };
 
-/** Amounts are typed in the viewer's currency (₦ or $) and sent to the API in USD. */
+/** Amounts are typed in the viewer's chosen currency and sent to the API in USD. */
 function useMoneyInput() {
-  const { currency, meta } = useSession();
-  const fx = currency === "NGN" ? (meta?.fxRateNgn ?? 1550) : 1;
+  const { currency, rate } = useSession();
+  const fx = rate(currency);
   return {
-    symbol: currency === "NGN" ? "₦" : "$",
+    symbol: currencySymbol(currency),
     show: (usd: number | null | undefined) => (usd == null ? "" : String(Math.round(usd * fx))),
     toUsd: (v: string) => Math.round((Number(v || 0) / fx) * 100) / 100,
   };

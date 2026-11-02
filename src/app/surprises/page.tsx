@@ -6,13 +6,13 @@ import { Info, Plus, Sparkles, Star, X } from "lucide-react";
 import { api, useMutation, usePagedApi } from "@/shared/lib/api";
 import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
-import { date, timeAgo } from "@/shared/lib/format";
+import { date, moneyIn, timeAgo } from "@/shared/lib/format";
 import { Badge, Button, Card, cx, EmptyState, ErrorState, Field, Input, Notice, PageHeader, SearchInput, Select, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { Modal, useToast } from "@/shared/ui/overlay";
 
 type SurpriseItem = { id: string; name: string; category: string; emoji: string; quantity: number; notes: string };
 type Surprise = {
-  id: string; reference: string; title: string; budgetMin: number; budgetMax: number; recipientName: string; deliveryCity: string; neededBy?: string; notes: string; status: string; createdAt: string; category: string;
+  id: string; reference: string; title: string; budgetMin: number; budgetMax: number; currency: string; budgetMinLocal: number; budgetMaxLocal: number; recipientName: string; deliveryCity: string; neededBy?: string; notes: string; status: string; createdAt: string; category: string;
   items: SurpriseItem[];
   quotes: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; createdAt: string; vendor: { name: string; rating: number; city: string } }[];
 };
@@ -39,11 +39,13 @@ const empty = { title: "", budgetMin: "", budgetMax: "", recipientName: "", deli
 
 export default function SurprisesPage() {
   const { data: paged, items: data, error, loading, reload, setPage, search, setSearch } = usePagedApi<Surprise>("/sender/surprises", {}, 10);
-  const { fmt, meta } = useSession();
+  const { fmt, meta, currency: viewerCurrency } = useSession();
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
+  // Budgets are set in the sender's chosen currency (their display currency by default).
+  const [currency, setCurrency] = useState(viewerCurrency);
   const [items, setItems] = useState<ItemDraft[]>(() => [newItem()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const categories = meta?.categories ?? [];
@@ -54,6 +56,7 @@ export default function SurprisesPage() {
       method: "POST",
       body: {
         ...form,
+        currency,
         budgetMin: Number(form.budgetMin),
         budgetMax: Number(form.budgetMax),
         neededBy: form.neededBy || null,
@@ -82,7 +85,7 @@ export default function SurprisesPage() {
     if (!form.title.trim()) e.title = "Give it a short title.";
     if (filled.length === 0) e.items = "Add at least one item, e.g. a money bouquet or flowers.";
     else if (filled.some((i) => !(Number(i.quantity) >= 1 && Number(i.quantity) <= 99))) e.items = "Quantities are between 1 and 99.";
-    if (!(Number(form.budgetMin) >= 5)) e.budgetMin = "At least $5.";
+    if (!(Number(form.budgetMin) > 0)) e.budgetMin = "Enter your minimum budget.";
     if (!(Number(form.budgetMax) >= Number(form.budgetMin))) e.budgetMax = "Must be at least the minimum.";
     if (!form.recipientName.trim()) e.recipientName = "Who is it for?";
     setErrors(e);
@@ -92,6 +95,7 @@ export default function SurprisesPage() {
       toast({ tone: "success", title: `${r.reference} sent to vendors`, body: "You'll be notified as quotes arrive." });
       close();
       setForm(empty);
+      setCurrency(viewerCurrency);
       setItems([newItem()]);
       reload();
     }
@@ -138,7 +142,8 @@ export default function SurprisesPage() {
                   {s.notes && <p className="mt-2 text-[13px] text-ink-700">“{s.notes}”</p>}
                 </div>
                 <div className="text-right">
-                  <Badge tone="gold">Budget {fmt(s.budgetMin)} – {fmt(s.budgetMax)}</Badge>
+                  <Badge tone="gold">Budget {moneyIn(s.budgetMinLocal, s.currency)} – {moneyIn(s.budgetMaxLocal, s.currency)}</Badge>
+                  {s.currency !== viewerCurrency && <p className="mt-1 text-[11px] text-ink-500">≈ {fmt(s.budgetMin)} – {fmt(s.budgetMax)}</p>}
                   <div className="mt-1"><StatusBadge status={s.status} /></div>
                 </div>
               </div>
@@ -235,11 +240,20 @@ export default function SurprisesPage() {
             {errors.items && <p id="items-err" className="text-xs font-medium text-danger-700" role="alert">{errors.items}</p>}
           </fieldset>
 
-          <Field label="Budget from (USD)" required error={errors.budgetMin} hint="For the whole list.">
-            {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.budgetMin} type="number" min={5} value={form.budgetMin} onChange={(e) => setForm({ ...form, budgetMin: e.target.value })} />}
+          <Field label="Currency" hint="Vendors see your budget in this currency." className="sm:col-span-2">
+            {(id, d) => (
+              <Select id={id} aria-describedby={d} value={currency} onChange={(e) => setCurrency(e.target.value)} className="sm:w-72">
+                {(meta?.currencies ?? [{ code: "NGN", name: "Nigerian naira", perUsd: 0 }, { code: "USD", name: "US dollar", perUsd: 1 }]).map((c) => (
+                  <option key={c.code} value={c.code}>{c.code} · {c.name}</option>
+                ))}
+              </Select>
+            )}
           </Field>
-          <Field label="Budget up to (USD)" required error={errors.budgetMax}>
-            {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.budgetMax} type="number" min={5} value={form.budgetMax} onChange={(e) => setForm({ ...form, budgetMax: e.target.value })} />}
+          <Field label={`Budget from (${currency})`} required error={errors.budgetMin ?? create.error?.errors?.budgetMin?.[0]} hint="For the whole list.">
+            {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.budgetMin} type="number" min={1} value={form.budgetMin} onChange={(e) => setForm({ ...form, budgetMin: e.target.value })} />}
+          </Field>
+          <Field label={`Budget up to (${currency})`} required error={errors.budgetMax}>
+            {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.budgetMax} type="number" min={1} value={form.budgetMax} onChange={(e) => setForm({ ...form, budgetMax: e.target.value })} />}
           </Field>
           <Field label="Recipient's first name" required error={errors.recipientName}>
             {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.recipientName} value={form.recipientName} onChange={(e) => setForm({ ...form, recipientName: e.target.value })} />}

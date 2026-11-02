@@ -11,7 +11,7 @@ import { Badge, ButtonLink, cx, EmptyState, ErrorState, PageSkeleton, ProductArt
 import { SendCashModal, SourceWishModal, type SharedWish } from "@/components/wish-actions";
 
 type Shared = {
-  id: string; title: string; description: string; occasion: string; eventDate: string; visibility: string; token: string;
+  id: string; title: string; description: string; occasion: string; eventDate: string; visibility: string; token: string; currency?: string;
   owner: { firstName: string; city: string };
   items: SharedWish[];
 };
@@ -19,7 +19,9 @@ type Shared = {
 export default function SharedWishlistPage() {
   const { token } = useParams<{ token: string }>();
   const { data, error, loading, reload } = useApi<Shared>(`/sender/wishlists/shared/${token}`);
-  const { fmt } = useSession();
+  const { fmt: fmtViewer, fmtIn } = useSession();
+  // Prices show in the currency the owner set the wishlist in.
+  const fmt = (usd: number | null | undefined) => (data?.currency ? fmtIn(usd, data.currency) : fmtViewer(usd));
   const [sourcing, setSourcing] = useState<SharedWish | null>(null);
   const [cash, setCash] = useState<SharedWish | "any" | null>(null);
   if (loading) return <PageSkeleton />;

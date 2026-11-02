@@ -13,7 +13,7 @@ import { Modal } from "@/shared/ui/overlay";
  * and the order is confirmed only by a server-side webhook.
  */
 export function PaymentSheet({ order, method, onClose, onPaid, payPath }: { order: { id: string; reference: string; total: number } | null; method: string; onClose: () => void; onPaid: () => void; /** Defaults to the order's pay endpoint; cash gifts pass their own. */ payPath?: string }) {
-  const { fmt, currency, meta } = useSession();
+  const { fmt, currency } = useSession();
   const [failure, setFailure] = useState<string | null>(null);
   const pay = useMutation((outcome: "success" | "fail") => api<{ status: string; reason?: string }>(payPath ?? `/sender/orders/${order!.id}/pay`, { method: "POST", body: { outcome } }));
 
@@ -35,7 +35,7 @@ export function PaymentSheet({ order, method, onClose, onPaid, payPath }: { orde
               <Badge tone="gold">Sandbox</Badge>
             </div>
             <p className="mt-1 font-display text-3xl font-semibold tabular">{fmt(order.total)}</p>
-            {currency === "NGN" ? <p className="text-xs text-plum-200">≈ ${order.total.toFixed(2)} USD base</p> : <p className="text-xs text-plum-200">≈ ₦{Math.round(order.total * (meta?.fxRateNgn ?? 1550)).toLocaleString()} at the sample rate</p>}
+            {currency !== "USD" ? <p className="text-xs text-plum-200">≈ ${order.total.toFixed(2)} USD base, at the sample rate</p> : <p className="text-xs text-plum-200">USD base currency</p>}
             <p className="mt-4 flex items-center gap-2 text-xs text-plum-200">
               <CreditCard className="size-4" aria-hidden /> {method} · Paystack (simulated)
             </p>
