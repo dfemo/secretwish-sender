@@ -5,6 +5,9 @@ import { date } from "@/shared/lib/format";
 import { Badge, ProductArt } from "@/shared/ui/primitives";
 import type { WishlistCard } from "@/lib/types";
 
+/** "Gifted once" / "Gifted 3 times". */
+export const giftedTimes = (n: number) => (n === 1 ? "Gifted once" : `Gifted ${n} times`);
+
 export function WishlistTile({ w }: { w: WishlistCard }) {
   return (
     <Link href={`/w/${w.token}`} className="group block overflow-hidden rounded-2xl bg-white shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-pop)]">
@@ -18,12 +21,14 @@ export function WishlistTile({ w }: { w: WishlistCard }) {
       <div className="p-4">
         <p className="font-semibold text-ink-900 group-hover:text-plum-700">{w.title}</p>
         <p className="text-xs text-ink-500">
-          {w.owner.firstName} · {w.owner.city} · {w.state === "Fulfilled" ? "every wish gifted" : `${w.remaining} of ${w.items} wishes left`}
+          {w.owner.firstName} · {w.owner.city} · {w.items === 0 ? "open to cash gifts" : w.state === "Fulfilled" ? "every wish gifted" : `${w.remaining} of ${w.items} wishes left`}
         </p>
-        {(w.state === "Fulfilled" || (w.gifters ?? 0) > 1) && (
+        {/* Gifts count orders and cash, including cash sent to the list as a whole (which has no wish to tick off). */}
+        {(w.state === "Fulfilled" || (w.gifts ?? 0) > 0) && (
           <p className="mt-1 flex flex-wrap gap-1">
             {w.state === "Fulfilled" && <Badge tone="success">Fulfilled</Badge>}
-            {(w.gifters ?? 0) > 1 && <Badge tone="plum">Gifted {w.gifts} times</Badge>}
+            {(w.gifts ?? 0) > 0 && <Badge tone="plum">{giftedTimes(w.gifts!)}</Badge>}
+            {(w.gifters ?? 0) > 1 && <Badge tone="gold">Multiple gifters</Badge>}
           </p>
         )}
         {w.eventDate && <p className="mt-1 text-[11px] font-semibold text-gold-700">{w.occasion} · {date(w.eventDate)}</p>}

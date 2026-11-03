@@ -9,6 +9,7 @@ import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
 import { Badge, ButtonLink, cx, EmptyState, ErrorState, Notice, PageSkeleton, ProductArt } from "@/shared/ui/primitives";
 import { SendCashModal, SourceWishModal, type SharedWish } from "@/components/wish-actions";
+import { giftedTimes } from "@/components/wishlist-tile";
 
 type Shared = {
   id: string; title: string; description: string; occasion: string; eventDate: string; visibility: string; token: string; currency?: string;
@@ -62,7 +63,8 @@ export default function SharedWishlistPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             {data.state === "Fulfilled" && <Badge tone="success" icon={CheckCircle2}>Fulfilled</Badge>}
             {data.state === "Closed" && <Badge tone="neutral" icon={Lock}>Closed</Badge>}
-            {data.gifters > 1 && <Badge tone="plum">Multiple gifters · gifted {data.gifts} times</Badge>}
+            {data.gifts > 0 && <Badge tone="plum">{giftedTimes(data.gifts)}</Badge>}
+            {data.gifters > 1 && <Badge tone="gold">Multiple gifters</Badge>}
           </div>
         </div>
       </header>
