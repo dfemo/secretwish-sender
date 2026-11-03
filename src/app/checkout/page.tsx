@@ -384,7 +384,7 @@ function CheckoutInner() {
                 {[
                   ["Gift", `${f.quantity} × ${title}${f.personalisation ? ` · ${f.personalisation}` : ""}`],
                   ["For", viaWishlist ? `${wishlist.data!.owner.firstName} (wishlist “${wishlist.data!.title}”)` : `${f.recipientName}, ${f.deliveryCity}`],
-                  ["Delivery", `${f.deliveryOption}${f.deliveryDate ? ` · by ${date(f.deliveryDate)}` : ""} · ${viaHub ? "delivered by SecretWish" : "delivered by the vendor"}`],
+                  ["Delivery", `${f.deliveryOption}${f.deliveryDate ? ` · by ${date(f.deliveryDate)}` : ""} · ${viaHub ? "to be delivered by a SecretWish agent" : "to be delivered by the vendor"}`],
                   ["Message", f.giftMessage || "No message"],
                   ["Privacy", `${f.revealSender ? "Name revealed after delivery" : "Anonymous"} · ${f.hidePrice ? "price hidden" : "price shown"} · ${f.discreetPackaging ? "discreet packaging" : "standard packaging"}`],
                   ["Payment", `${f.method} (simulated)`],

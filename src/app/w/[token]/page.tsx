@@ -69,7 +69,7 @@ export default function SharedWishlistPage() {
             {data.state === "Closed" && <Badge tone="neutral" icon={Lock}>Closed</Badge>}
             {data.gifts > 0 && <Badge tone="plum">{giftedTimes(data.gifts)}</Badge>}
             {data.gifters > 1 && <Badge tone="gold">Multiple gifters</Badge>}
-            {data.viaHub && <Badge tone="info">Delivered by SecretWish</Badge>}
+            {data.viaHub && <Badge tone="info">To be delivered by a SecretWish agent</Badge>}
           </div>
         </div>
       </header>
