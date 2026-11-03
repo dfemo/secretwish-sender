@@ -24,6 +24,11 @@ export type WishlistCard = {
   owner: { firstName: string; city: string };
   items: number;
   remaining: number;
+  /** Open, Fulfilled (every wish gifted, still giftable) or Closed. */
+  state?: "Open" | "Fulfilled" | "Closed";
+  /** Paid gifts and distinct gifters (on discover pages). */
+  gifts?: number | null;
+  gifters?: number | null;
   preview: { emoji: string; tint: string }[];
 };
 

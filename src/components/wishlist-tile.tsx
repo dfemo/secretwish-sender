@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { date } from "@/shared/lib/format";
-import { ProductArt } from "@/shared/ui/primitives";
+import { Badge, ProductArt } from "@/shared/ui/primitives";
 import type { WishlistCard } from "@/lib/types";
 
 export function WishlistTile({ w }: { w: WishlistCard }) {
@@ -18,8 +18,14 @@ export function WishlistTile({ w }: { w: WishlistCard }) {
       <div className="p-4">
         <p className="font-semibold text-ink-900 group-hover:text-plum-700">{w.title}</p>
         <p className="text-xs text-ink-500">
-          {w.owner.firstName} · {w.owner.city} · {w.remaining} of {w.items} wishes left
+          {w.owner.firstName} · {w.owner.city} · {w.state === "Fulfilled" ? "every wish gifted" : `${w.remaining} of ${w.items} wishes left`}
         </p>
+        {(w.state === "Fulfilled" || (w.gifters ?? 0) > 1) && (
+          <p className="mt-1 flex flex-wrap gap-1">
+            {w.state === "Fulfilled" && <Badge tone="success">Fulfilled</Badge>}
+            {(w.gifters ?? 0) > 1 && <Badge tone="plum">Gifted {w.gifts} times</Badge>}
+          </p>
+        )}
         {w.eventDate && <p className="mt-1 text-[11px] font-semibold text-gold-700">{w.occasion} · {date(w.eventDate)}</p>}
       </div>
     </Link>
