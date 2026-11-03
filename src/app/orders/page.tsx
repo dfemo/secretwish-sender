@@ -70,8 +70,8 @@ export default function OrdersPage() {
   );
 }
 
-type CashRow = { id: string; reference: string; amountUsd: number; feeUsd: number; totalUsd: number; status: string; createdAt: string; recipient: string; message: string };
-const cashStatus: Record<string, string> = { PaymentPending: "Not paid", PayoutPending: "Paid · waiting for their bank details", PaidOut: "Delivered to their bank", Paid: "Paid" };
+type CashRow = { id: string; reference: string; amountUsd: number; feeUsd: number; totalUsd: number; status: string; createdAt: string; recipient: string; message: string; receivedAt: string | null; thankYouNote: string | null };
+const cashStatus: Record<string, string> = { PaymentPending: "Not paid", PayoutPending: "Paid · SecretWish is sending it", PaidOut: "Sent to their bank", Received: "Received", Paid: "Paid", Failed: "Payment failed" };
 
 /** Cash the sender has sent through SecretWish. */
 function SentCash() {
@@ -90,6 +90,8 @@ function SentCash() {
               <div className="min-w-[180px] flex-1">
                 <p className="font-semibold">{fmt(g.amountUsd)} for {g.recipient}</p>
                 <p className="text-xs text-ink-500">{g.reference} · {date(g.createdAt)} · {cashStatus[g.status] ?? g.status}</p>
+                {g.receivedAt && <p className="mt-1 text-xs text-success-700">{g.recipient} confirmed it arrived on {date(g.receivedAt)}</p>}
+                {g.thankYouNote && <p className="mt-1 rounded-xl bg-plum-50 px-3 py-2 text-sm text-plum-900 italic">“{g.thankYouNote}”</p>}
               </div>
               <p className="text-right text-xs text-ink-500">Paid {fmt(g.totalUsd)}<br />incl. {fmt(g.feeUsd)} fee</p>
             </Card>
