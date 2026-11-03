@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, CreditCard, Eye, EyeOff, Landmark, Lock, MapPin, Package } from "lucide-react";
+import { ArrowLeft, Check, CreditCard, Eye, EyeOff, Landmark, Lock, MapPin, Package, Warehouse } from "lucide-react";
 import { api, ApiError, useApi, useMutation } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
@@ -13,7 +13,8 @@ import { PaymentSheet } from "@/components/payment-sheet";
 import type { Product } from "@/lib/types";
 
 type Pricing = { unit: number; qty: number; subtotal: number; deliveryFee: number; discount: number; tax: number; total: number; freeSample: boolean; planRequired: boolean; promoMessage?: string };
-type SharedWl = { title: string; token: string; owner: { firstName: string; city: string }; items: { id: string; notes: string; quantity: number }[] };
+/** viaHub: the list's gifts are delivered through SecretWish (its owner asked, or they come from several vendors). */
+type SharedWl = { title: string; token: string; owner: { firstName: string; city: string }; items: { id: string; notes: string; quantity: number }[]; viaHub?: boolean };
 type Surprise = { id: string; title: string; items: { id: string; name: string; emoji: string; quantity: number; notes: string }[]; budgetMin: number; budgetMax: number; recipientName: string; recipientEmail?: string | null; deliveryCity: string; wishlistToken?: string | null; wishlistItemId?: string | null; quotes: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; vendor: { name: string } }[] };
 
 const steps = ["Gift", "Recipient", "Message", "Privacy", "Payment", "Review"] as const;
@@ -43,7 +44,7 @@ function CheckoutInner() {
   const [f, setF] = useState({
     quantity: 1, personalisation: "", budgetMin: "", budgetMax: "",
     recipientName: "", recipientPhone: "", recipientEmail: "", deliveryAddress: "", deliveryCity: "Lagos", deliveryOption: "Standard", deliveryDate: "",
-    giftMessage: "", revealSender: false, hidePrice: true, discreetPackaging: true, method: "Card", promoCode: "",
+    giftMessage: "", revealSender: false, hidePrice: true, discreetPackaging: true, method: "Card", promoCode: "", viaHub: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pricing, setPricing] = useState<Pricing | null>(null);
@@ -83,7 +84,7 @@ function CheckoutInner() {
         productId: quoteId ? null : productId, quoteId, quantity: f.quantity, wishlistToken: wlToken, wishlistItemId: itemId,
         recipientName: f.recipientName, recipientPhone: f.recipientPhone, recipientEmail: f.recipientEmail.trim() || null, deliveryAddress: f.deliveryAddress, deliveryCity: f.deliveryCity,
         deliveryDate: f.deliveryDate || null, deliveryOption: f.deliveryOption, giftMessage: f.giftMessage, personalisation: f.personalisation,
-        revealSender: f.revealSender, discreetPackaging: f.discreetPackaging, hidePrice: f.hidePrice, promoCode: f.promoCode,
+        revealSender: f.revealSender, discreetPackaging: f.discreetPackaging, hidePrice: f.hidePrice, promoCode: f.promoCode, viaHub: hubForced || f.viaHub,
         budgetMin: f.budgetMin ? Number(f.budgetMin) : null, budgetMax: f.budgetMax ? Number(f.budgetMax) : null,
       },
     }),
@@ -99,6 +100,9 @@ function CheckoutInner() {
   const vendor = quote ? quote.vendor.name : p!.vendor.name;
   const unit = quote ? quote.priceUsd : p!.priceUsd;
   const viaWishlist = !!wishlist.data;
+  // The recipient chose SecretWish delivery for their list (or its gifts come from several vendors), so it isn't the sender's call.
+  const hubForced = !!wishlist.data?.viaHub;
+  const viaHub = hubForced || f.viaHub;
   const today = new Date().toISOString().slice(0, 10);
 
   const validate = (s: number) => {
@@ -187,7 +191,7 @@ function CheckoutInner() {
             <section className="space-y-5" aria-labelledby="s0">
               <h2 id="s0" className="font-display text-xl font-semibold">Review your gift</h2>
               <div className="flex items-center gap-4 rounded-2xl bg-ivory-100 p-4">
-                <ProductArt emoji={emoji} tint={p?.tint} size="md" />
+                <ProductArt emoji={emoji} tint={p?.tint} src={p?.images?.[0]} size="md" />
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{title}</p>
                   <p className="text-xs text-ink-500">{quote ? quote.description : `by ${vendor}`}</p>
@@ -292,6 +296,26 @@ function CheckoutInner() {
                   ))}
                 </div>
               </fieldset>
+              <fieldset>
+                <legend className="mb-2 text-[13px] font-semibold text-ink-700">Who delivers it?</legend>
+                {hubForced ? (
+                  <Notice tone="info" icon={Warehouse}>
+                    SecretWish delivers gifts from {wishlist.data!.owner.firstName}&apos;s list: the vendor brings it to us, we check it and deliver it with their other gifts.
+                  </Notice>
+                ) : (
+                  <div className="space-y-2">
+                    {[
+                      { hub: false, title: "The vendor delivers it", body: "Straight from the vendor with their courier. SecretWish agents watch the delivery." },
+                      { hub: true, title: "SecretWish delivers it", body: "The vendor brings it to the SecretWish hub; we check it, then deliver it ourselves. Can take a little longer." },
+                    ].map((o) => (
+                      <label key={String(o.hub)} className={cx("flex cursor-pointer gap-3 rounded-xl border px-4 py-3 text-sm", f.viaHub === o.hub ? "border-plum-500 bg-plum-50" : "border-ink-200 hover:border-plum-200")}>
+                        <input type="radio" name="via-hub" checked={f.viaHub === o.hub} onChange={() => set("viaHub", o.hub)} className="mt-0.5 accent-plum-700" />
+                        <span><span className="font-semibold">{o.title}</span><span className="block text-xs text-ink-500">{o.body}</span></span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
               <Field label="Deliver on or before (optional)" error={errors.deliveryDate}>
                 {(id, d) => <Input id={id} aria-describedby={d} type="date" min={today} value={f.deliveryDate} onChange={(e) => set("deliveryDate", e.target.value)} className="w-52" />}
               </Field>
@@ -360,7 +384,7 @@ function CheckoutInner() {
                 {[
                   ["Gift", `${f.quantity} × ${title}${f.personalisation ? ` · ${f.personalisation}` : ""}`],
                   ["For", viaWishlist ? `${wishlist.data!.owner.firstName} (wishlist “${wishlist.data!.title}”)` : `${f.recipientName}, ${f.deliveryCity}`],
-                  ["Delivery", `${f.deliveryOption}${f.deliveryDate ? ` · by ${date(f.deliveryDate)}` : ""}`],
+                  ["Delivery", `${f.deliveryOption}${f.deliveryDate ? ` · by ${date(f.deliveryDate)}` : ""} · ${viaHub ? "delivered by SecretWish" : "delivered by the vendor"}`],
                   ["Message", f.giftMessage || "No message"],
                   ["Privacy", `${f.revealSender ? "Name revealed after delivery" : "Anonymous"} · ${f.hidePrice ? "price hidden" : "price shown"} · ${f.discreetPackaging ? "discreet packaging" : "standard packaging"}`],
                   ["Payment", `${f.method} (simulated)`],

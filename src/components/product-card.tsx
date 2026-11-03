@@ -10,7 +10,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { fmt } = useSession();
   return (
     <Link href={`/products/${product.id}`} className="group block">
-      <ProductArt emoji={product.emoji} tint={product.tint} size="lg" className="transition-transform group-hover:scale-[1.02]" label={product.name} />
+      <ProductArt emoji={product.emoji} tint={product.tint} src={product.images?.[0]} size="lg" className="transition-transform group-hover:scale-[1.02]" label={product.name} />
       <div className="mt-2.5 px-0.5">
         <p className="line-clamp-1 text-sm font-semibold text-ink-900 group-hover:text-plum-700">{product.name}</p>
         <p className="line-clamp-1 text-xs text-ink-500">{product.vendor.name}</p>

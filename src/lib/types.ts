@@ -6,6 +6,8 @@ export type Product = {
   stock: number;
   emoji: string;
   tint: string;
+  /** Photo links, cover first (empty: show the emoji). */
+  images?: string[];
   status: string;
   deliveryOptions: string[];
   rating: number;

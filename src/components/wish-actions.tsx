@@ -12,7 +12,7 @@ import { PaymentSheet } from "@/components/payment-sheet";
 export type SharedWish = {
   id: string; kind: "Catalog" | "Custom" | "Cash"; name: string; notes: string; quantity: number; fulfilled: boolean; category: string; categoryId: string | null;
   url: string | null; imageUrl: string | null; estimatedPriceUsd: number | null; cashAmountUsd: number | null;
-  product: { id: string; name: string; priceUsd: number; emoji: string; tint: string; available: boolean; vendor: string } | null;
+  product: { id: string; name: string; priceUsd: number; emoji: string; tint: string; image?: string | null; available: boolean; vendor: string } | null;
 };
 
 /** Amounts are typed in the viewer's chosen currency and sent to the API in USD. */

@@ -8,6 +8,7 @@ import { useApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { Badge, ButtonLink, Card, CardHeader, ErrorState, PageSkeleton, ProductArt } from "@/shared/ui/primitives";
 import { rememberViewed, type Product } from "@/lib/types";
+import { ProductGallery } from "@/components/product-gallery";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +28,7 @@ export default function ProductPage() {
         <ArrowLeft className="size-4" aria-hidden /> Discover
       </Link>
       <div className="grid gap-8 md:grid-cols-2 md:gap-12">
-        <ProductArt emoji={p.emoji} tint={p.tint} size="lg" className="text-[140px]" label={p.name} />
+        <ProductGallery product={p} />
         <div>
           <p className="text-sm font-semibold text-gold-700">{p.category}</p>
           <h1 className="mt-1 font-display text-4xl leading-tight font-semibold text-plum-900">{p.name}</h1>
@@ -87,7 +88,7 @@ export default function ProductPage() {
                   <tr key={c.id} className={i === 0 ? "bg-plum-50/60" : "border-t border-ink-100"}>
                     <td className="px-3 py-3">
                       <Link href={`/products/${c.id}`} className="flex items-center gap-3 font-semibold hover:text-plum-700">
-                        <ProductArt emoji={c.emoji} tint={c.tint} size="sm" /> {c.name} {i === 0 && <Badge tone="plum">Viewing</Badge>}
+                        <ProductArt emoji={c.emoji} tint={c.tint} src={c.images?.[0]} size="sm" /> {c.name} {i === 0 && <Badge tone="plum">Viewing</Badge>}
                       </Link>
                     </td>
                     <td className="px-3 py-3 text-ink-700">{c.vendor.name}</td>

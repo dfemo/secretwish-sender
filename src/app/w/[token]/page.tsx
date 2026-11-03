@@ -20,6 +20,8 @@ type Shared = {
   closed: boolean;
   /** Thanks / NoLongerNeeded when the owner closed it (note = their message, if they shared it), Staff when SecretWish did. */
   closure: { at: string; kind: "Thanks" | "NoLongerNeeded" | "Staff"; note: string | null } | null;
+  /** Gifts from this list are delivered by SecretWish via its hub. */
+  viaHub?: boolean;
   gifts: number;
   gifters: number;
   /** Times each wish has been gifted, by item id. */
@@ -67,6 +69,7 @@ export default function SharedWishlistPage() {
             {data.state === "Closed" && <Badge tone="neutral" icon={Lock}>Closed</Badge>}
             {data.gifts > 0 && <Badge tone="plum">{giftedTimes(data.gifts)}</Badge>}
             {data.gifters > 1 && <Badge tone="gold">Multiple gifters</Badge>}
+            {data.viaHub && <Badge tone="info">Delivered by SecretWish</Badge>}
           </div>
         </div>
       </header>
@@ -100,7 +103,7 @@ export default function SharedWishlistPage() {
             <li key={it.id} className={cx(data.closed && "opacity-70")}>
               <div className="relative">
                 {p ? (
-                  <ProductArt emoji={p.emoji} tint={p.tint} size="lg" label={p.name} />
+                  <ProductArt emoji={p.emoji} tint={p.tint} src={p.image} size="lg" label={p.name} />
                 ) : it.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={it.imageUrl} alt={it.name} referrerPolicy="no-referrer" className="aspect-square w-full rounded-2xl object-cover" />
