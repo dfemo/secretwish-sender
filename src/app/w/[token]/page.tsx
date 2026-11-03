@@ -18,6 +18,8 @@ type Shared = {
   /** Open; Fulfilled (every wish gifted, others can still give); Closed by SecretWish (no more gifts). */
   state: "Open" | "Fulfilled" | "Closed";
   closed: boolean;
+  /** Thanks / NoLongerNeeded when the owner closed it (note = their message, if they shared it), Staff when SecretWish did. */
+  closure: { at: string; kind: "Thanks" | "NoLongerNeeded" | "Staff"; note: string | null } | null;
   gifts: number;
   gifters: number;
   /** Times each wish has been gifted, by item id. */
@@ -68,11 +70,17 @@ export default function SharedWishlistPage() {
           </div>
         </div>
       </header>
-      {data.closed && (
-        <Notice className="mb-6" tone="info" title="This wishlist is closed">
-          SecretWish has closed {data.owner.firstName}&apos;s list, so it can&apos;t receive more gifts. You can still look through it.
-        </Notice>
-      )}
+      {data.closed &&
+        (data.closure && data.closure.kind !== "Staff" ? (
+          <Notice className="mb-6" tone={data.closure.kind === "Thanks" ? "success" : "info"} title={data.closure.kind === "Thanks" ? `${data.owner.firstName} has closed this list to say thank you` : `${data.owner.firstName} doesn't need gifts from this list any more`}>
+            {data.closure.note && <span className="block font-display text-base italic">“{data.closure.note}”</span>}
+            <span className="mt-1 block text-xs">It can&apos;t receive more gifts, but you can still look through it.</span>
+          </Notice>
+        ) : (
+          <Notice className="mb-6" tone="info" title="This wishlist is closed">
+            SecretWish has closed {data.owner.firstName}&apos;s list, so it can&apos;t receive more gifts. You can still look through it.
+          </Notice>
+        ))}
       {data.state === "Fulfilled" && (
         <Notice className="mb-6" tone="success" title={`Every wish on ${data.owner.firstName}'s list has been gifted`}>
           You can still give something too: gifted wishes stay open for more gifters.
