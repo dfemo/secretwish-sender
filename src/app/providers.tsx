@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Compass, Gift, Home, PackageCheck, Sparkles, UserRound } from "lucide-react";
+import { Compass, Gift, Home, PackageCheck, Sparkles, Trophy, UserRound } from "lucide-react";
 import { SessionProvider } from "@/shared/lib/session";
 import { ConsumerShell, type NavItem } from "@/shared/layout/shell";
 import { ToastProvider } from "@/shared/ui/overlay";
@@ -12,6 +12,7 @@ const items: NavItem[] = [
   { href: "/wishlists", label: "Wishlists", icon: Gift },
   { href: "/surprises", label: "Surprises", icon: Sparkles },
   { href: "/orders", label: "My gifts", icon: PackageCheck },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/account", label: "Account", icon: UserRound },
 ];
 
