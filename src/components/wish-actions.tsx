@@ -12,6 +12,9 @@ import { PaymentSheet } from "@/components/payment-sheet";
 export type SharedWish = {
   id: string; kind: "Catalog" | "Custom" | "Cash"; name: string; notes: string; quantity: number; fulfilled: boolean; category: string; categoryId: string | null;
   url: string | null; imageUrl: string | null; estimatedPriceUsd: number | null; cashAmountUsd: number | null;
+  /** One sender per wish. state: Open, Taken (someone else is fulfilling it) or Fulfilled; mine: you hold it, and status says how far it is
+   * (Claimed → SenderCompleted → RecipientConfirmed → Confirmed). */
+  claim?: { state: "Open" | "Taken" | "Fulfilled"; mine: boolean; status: string | null };
   product: { id: string; name: string; priceUsd: number; emoji: string; tint: string; image?: string | null; available: boolean; vendor: string } | null;
 };
 

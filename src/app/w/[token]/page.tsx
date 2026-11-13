@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Banknote, CalendarHeart, CheckCircle2, ExternalLink, Gift, Lock, MapPin, Sparkles } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { api, useApi, useMutation } from "@/shared/lib/api";
+import { useToast } from "@/shared/ui/overlay";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
-import { Badge, ButtonLink, cx, EmptyState, ErrorState, Notice, PageSkeleton, ProductArt } from "@/shared/ui/primitives";
+import { Badge, Button, ButtonLink, cx, EmptyState, ErrorState, Notice, PageSkeleton, ProductArt } from "@/shared/ui/primitives";
 import { SendCashModal, SourceWishModal, type SharedWish } from "@/components/wish-actions";
 import { giftedTimes } from "@/components/wishlist-tile";
 
@@ -26,6 +27,12 @@ type Shared = {
   gifters: number;
   /** Times each wish has been gifted, by item id. */
   giftCounts: Record<string, number>;
+  isBirthday?: boolean;
+  /** Blacklisted by SecretWish (the list or its owner): it can be seen but not gifted from. */
+  blacklisted?: boolean;
+  blockedReason?: string | null;
+  /** Why you can't gift anything yet (no date of birth on your account), or null. */
+  senderBlocked?: string | null;
 };
 
 /** "Gifted" the first time, "Gifted ×N" when several people have given it. */
@@ -39,6 +46,8 @@ export default function SharedWishlistPage() {
   const fmt = (usd: number | null | undefined) => (data?.currency ? fmtIn(usd, data.currency) : fmtViewer(usd));
   const [sourcing, setSourcing] = useState<SharedWish | null>(null);
   const [cash, setCash] = useState<SharedWish | "any" | null>(null);
+  const toast = useToast();
+  const claim = useMutation((itemId: string, action: "complete" | "release") => api(`/sender/wishlists/shared/${token}/items/${itemId}/${action}`, { method: "POST" }));
   if (loading) return <PageSkeleton />;
   if (error?.status === 404)
     return <EmptyState icon={Lock} title="This wishlist isn't available" description="The link may have been changed by its owner, or the list is now private. Ask them for a fresh link." action={<ButtonLink href="/wishlists">Back to wishlists</ButtonLink>} />;
@@ -70,6 +79,7 @@ export default function SharedWishlistPage() {
             {data.gifts > 0 && <Badge tone="plum">{giftedTimes(data.gifts)}</Badge>}
             {data.gifters > 1 && <Badge tone="gold">Multiple gifters</Badge>}
             {data.viaHub && <Badge tone="info">To be delivered by a SecretWish agent</Badge>}
+            {data.isBirthday && <Badge tone="gold" icon={CalendarHeart}>Birthday wishlist</Badge>}
           </div>
         </div>
       </header>
@@ -84,11 +94,20 @@ export default function SharedWishlistPage() {
             SecretWish has closed {data.owner.firstName}&apos;s list, so it can&apos;t receive more gifts. You can still look through it.
           </Notice>
         ))}
-      {data.state === "Fulfilled" && (
-        <Notice className="mb-6" tone="success" title={`Every wish on ${data.owner.firstName}'s list has been gifted`}>
-          You can still give something too: gifted wishes stay open for more gifters.
+      {data.blacklisted && (
+        <Notice className="mb-6" tone="danger" title="Gifting is paused on this list">
+          {data.blockedReason ?? "This wishlist isn't available for gifting."} You can still look through it.
         </Notice>
       )}
+      {data.senderBlocked && !data.blacklisted && !data.closed && (
+        <Notice className="mb-6" tone="warning" title="Add your date of birth to gift">{data.senderBlocked}</Notice>
+      )}
+      {data.state === "Fulfilled" && (
+        <Notice className="mb-6" tone="success" title={`Every wish on ${data.owner.firstName}'s list has been gifted`}>
+          Each wish is fulfilled by one person, so there&apos;s nothing left to pick. You can still send {data.owner.firstName} cash.
+        </Notice>
+      )}
+      {claim.error && <Notice className="mb-6" tone="danger">{claim.error.message}</Notice>}
       <p className="mb-6 flex items-center gap-2 rounded-xl bg-plum-50 px-4 py-2.5 text-[13px] text-plum-800">
         <Lock className="size-4 shrink-0" aria-hidden /> {data.owner.firstName}&apos;s address stays private. We deliver to it for you — you&apos;ll only see the city.
       </p>
@@ -97,7 +116,12 @@ export default function SharedWishlistPage() {
           const p = it.product;
           // Gifted wishes stay open to more gifters until the list is closed.
           const times = Math.max(data.giftCounts[it.id] ?? 0, it.fulfilled ? 1 : 0);
-          const giftable = !data.closed && (it.kind !== "Catalog" || !!p?.available);
+          // One sender per wish: a wish someone else is fulfilling (or that's done) can't be gifted again.
+          const mine = !!it.claim?.mine;
+          const taken = it.claim?.state === "Taken" && !mine;
+          const done = it.claim?.state === "Fulfilled" || it.fulfilled;
+          const blocked = data.closed || !!data.blacklisted || !!data.senderBlocked;
+          const giftable = !blocked && !taken && !done && (!mine || it.claim?.status === "Claimed") && (it.kind !== "Catalog" || !!p?.available);
           const price = p?.priceUsd ?? it.cashAmountUsd ?? it.estimatedPriceUsd;
           return (
             <li key={it.id} className={cx(data.closed && "opacity-70")}>
@@ -111,7 +135,13 @@ export default function SharedWishlistPage() {
                   <ProductArt emoji={it.kind === "Cash" ? "💸" : "🎁"} tint={it.kind === "Cash" ? "sage" : "lavender"} size="lg" label={it.name} />
                 )}
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
-                  {times > 0 ? (
+                  {done ? (
+                    <Badge tone="success" icon={CheckCircle2}>Fulfilled</Badge>
+                  ) : mine ? (
+                    <Badge tone="gold">{it.claim?.status === "Claimed" ? "You're fulfilling this" : it.claim?.status === "SenderCompleted" ? `Waiting for ${data.owner.firstName}` : "Confirming"}</Badge>
+                  ) : taken ? (
+                    <Badge tone="neutral">Someone&apos;s fulfilling this</Badge>
+                  ) : times > 0 ? (
                     <Badge tone="success" icon={CheckCircle2}>{giftedLabel(times)}</Badge>
                   ) : index === 0 ? (
                     <Badge tone="gold">★ Most wanted</Badge>
@@ -133,10 +163,12 @@ export default function SharedWishlistPage() {
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-sm font-bold tabular">{price != null ? `${it.kind === "Custom" ? "~" : ""}${fmt(price)}` : ""}</span>
                 {!giftable ? (
-                  <span className="text-xs text-ink-400">{data.closed ? "List closed" : "Not available"}</span>
+                  <span className="text-xs text-ink-400">
+                    {data.closed ? "List closed" : data.blacklisted ? "Paused" : done ? "Fulfilled" : taken ? "Taken" : mine ? "Done, thank you" : data.senderBlocked ? "Add your date of birth" : "Not available"}
+                  </span>
                 ) : it.kind === "Catalog" ? (
                   <Link href={`/checkout?product=${p!.id}&wl=${data.token}&item=${it.id}`} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
-                    <Gift className="size-3.5" aria-hidden /> {times > 0 ? "Gift it too" : "Gift this"}
+                    <Gift className="size-3.5" aria-hidden /> {mine ? "Continue" : "Gift this"}
                   </Link>
                 ) : it.kind === "Cash" ? (
                   <button type="button" onClick={() => setCash(it)} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
@@ -148,11 +180,21 @@ export default function SharedWishlistPage() {
                   </button>
                 )}
               </div>
+              {mine && it.claim?.status === "Claimed" && !blocked && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="secondary" loading={claim.pending} onClick={async () => {
+                    if ((await claim.run(it.id, "complete")) !== undefined) { toast({ tone: "success", title: "Marked completed", body: `${data.owner.firstName} will be asked to confirm.` }); reload(); }
+                  }}>Mark completed</Button>
+                  <Button size="sm" variant="ghost" disabled={claim.pending} onClick={async () => {
+                    if ((await claim.run(it.id, "release")) !== undefined) { toast({ tone: "info", title: "Wish released", body: "Someone else can gift it now." }); reload(); }
+                  }}>Let someone else</Button>
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
-      {!data.closed && <p className="mt-10 text-center text-sm text-ink-500">
+      {!data.closed && !data.blacklisted && !data.senderBlocked && <p className="mt-10 text-center text-sm text-ink-500">
         Not sure what to pick? <button type="button" className="font-semibold text-plum-700 underline" onClick={() => setCash("any")}>Send {data.owner.firstName} cash instead</button>
       </p>}
       {sourcing && <SourceWishModal token={data.token} wish={sourcing} ownerName={data.owner.firstName} onClose={() => setSourcing(null)} />}
