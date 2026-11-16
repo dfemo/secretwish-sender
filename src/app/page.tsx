@@ -7,7 +7,7 @@ import { ArrowRight, Gift, Search, Sparkles, Truck } from "lucide-react";
 import { useApi, type Paged } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
-import { ButtonLink, Card, ErrorState, PageSkeleton, ProductArt, StatusBadge, cx } from "@/shared/ui/primitives";
+import { ButtonLink, Card, ErrorState, PageSkeleton, ProductArt, StatusBadge, cx, useGreeting } from "@/shared/ui/primitives";
 import { ProductCard } from "@/components/product-card";
 import { WishlistTile } from "@/components/wishlist-tile";
 import { recentlyViewed, type Product, type WishlistCard } from "@/lib/types";
@@ -23,7 +23,8 @@ type Home = {
 
 export default function SenderHome() {
   const { data, error, loading, reload } = useApi<Home>("/sender/home");
-  const { meta, fmt } = useSession();
+  const { meta, fmt, persona } = useSession();
+  const { greeting, today } = useGreeting(persona.name);
   const router = useRouter();
   const [q, setQ] = useState("");
   const [viewed, setViewed] = useState<string[]>([]);
@@ -42,7 +43,7 @@ export default function SenderHome() {
         <div className="pointer-events-none absolute right-10 bottom-6 hidden text-[120px] leading-none opacity-90 md:block" aria-hidden>
           🎁
         </div>
-        <p className="text-sm font-semibold text-gold-300">Welcome back, {data.user.name.split(" ")[0]}</p>
+        <p className="text-sm font-semibold text-gold-300">{greeting}{today && <span className="font-normal text-plum-200"> · {today}</span>}</p>
         <h1 className="mt-2 max-w-xl font-display text-4xl leading-[1.1] font-semibold md:text-5xl">Who are we surprising today?</h1>
         <form
           role="search"
