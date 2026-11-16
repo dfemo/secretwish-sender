@@ -47,7 +47,7 @@ export default function SharedWishlistPage() {
   const [sourcing, setSourcing] = useState<SharedWish | null>(null);
   const [cash, setCash] = useState<SharedWish | "any" | null>(null);
   const toast = useToast();
-  const claim = useMutation((itemId: string, action: "complete" | "release") => api(`/sender/wishlists/shared/${token}/items/${itemId}/${action}`, { method: "POST" }));
+  const claim = useMutation((itemId: string, action: "complete" | "release" | "partial") => api(`/sender/wishlists/shared/${token}/items/${itemId}/${action}`, { method: "POST" }));
   if (loading) return <PageSkeleton />;
   if (error?.status === 404)
     return <EmptyState icon={Lock} title="This wishlist isn't available" description="The link may have been changed by its owner, or the list is now private. Ask them for a fresh link." action={<ButtonLink href="/wishlists">Back to wishlists</ButtonLink>} />;
@@ -123,6 +123,10 @@ export default function SharedWishlistPage() {
           const blocked = data.closed || !!data.blacklisted || !!data.senderBlocked;
           const giftable = !blocked && !taken && !done && (!mine || it.claim?.status === "Claimed") && (it.kind !== "Catalog" || !!p?.available);
           const price = p?.priceUsd ?? it.cashAmountUsd ?? it.estimatedPriceUsd;
+          // Cash wishes can be shared: part sent, the rest still to come.
+          const cashLeft = it.kind === "Cash" ? (it.cashRemainingUsd ?? null) : null;
+          const cashSent = it.kind === "Cash" ? (it.cashRaisedUsd ?? 0) : 0;
+          const shortOfAmount = cashLeft != null && cashLeft > 0;
           return (
             <li key={it.id} className={cx(data.closed && "opacity-70")}>
               <div className="relative">
@@ -141,6 +145,8 @@ export default function SharedWishlistPage() {
                     <Badge tone="gold">{it.claim?.status === "Claimed" ? "You're fulfilling this" : it.claim?.status === "SenderCompleted" ? `Waiting for ${data.owner.firstName}` : "Confirming"}</Badge>
                   ) : taken ? (
                     <Badge tone="neutral">Someone&apos;s fulfilling this</Badge>
+                  ) : it.partial ? (
+                    <Badge tone="gold">Partly fulfilled</Badge>
                   ) : times > 0 ? (
                     <Badge tone="success" icon={CheckCircle2}>{giftedLabel(times)}</Badge>
                   ) : index === 0 ? (
@@ -160,8 +166,16 @@ export default function SharedWishlistPage() {
                 </a>
               )}
               {it.notes && <p className="mt-1 text-xs text-ink-700 italic">“{it.notes}”</p>}
+              {it.kind === "Cash" && it.cashAmountUsd != null && cashSent > 0 && !done && (
+                <div className="mt-1.5">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-label="Sent so far" aria-valuemin={0} aria-valuemax={it.cashAmountUsd} aria-valuenow={cashSent}>
+                    <div className="h-full rounded-full bg-success-600" style={{ width: `${Math.min(100, (cashSent / it.cashAmountUsd) * 100)}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs text-ink-500">{fmt(cashSent)} sent · <span className="font-semibold text-ink-700">{fmt(cashLeft ?? 0)} to go</span></p>
+                </div>
+              )}
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-sm font-bold tabular">{price != null ? `${it.kind === "Custom" ? "~" : ""}${fmt(price)}` : ""}</span>
+                <span className="text-sm font-bold tabular">{shortOfAmount && cashSent > 0 ? `${fmt(cashLeft!)} left` : price != null ? `${it.kind === "Custom" ? "~" : ""}${fmt(price)}` : ""}</span>
                 {!giftable ? (
                   <span className="text-xs text-ink-400">
                     {data.closed ? "List closed" : data.blacklisted ? "Paused" : done ? "Fulfilled" : taken ? "Taken" : mine ? "Done, thank you" : data.senderBlocked ? "Add your date of birth" : "Not available"}
@@ -172,7 +186,7 @@ export default function SharedWishlistPage() {
                   </Link>
                 ) : it.kind === "Cash" ? (
                   <button type="button" onClick={() => setCash(it)} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
-                    <Banknote className="size-3.5" aria-hidden /> Send cash
+                    <Banknote className="size-3.5" aria-hidden /> {it.partial || cashSent > 0 ? "Add to it" : "Send cash"}
                   </button>
                 ) : (
                   <button type="button" onClick={() => setSourcing(it)} className="inline-flex items-center gap-1 rounded-lg bg-plum-800 px-3 py-1.5 text-xs font-semibold text-ivory-50 hover:bg-plum-700">
@@ -182,9 +196,16 @@ export default function SharedWishlistPage() {
               </div>
               {mine && it.claim?.status === "Claimed" && !blocked && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Button size="sm" variant="secondary" loading={claim.pending} onClick={async () => {
-                    if ((await claim.run(it.id, "complete")) !== undefined) { toast({ tone: "success", title: "Marked completed", body: `${data.owner.firstName} will be asked to confirm.` }); reload(); }
-                  }}>Mark completed</Button>
+                  {shortOfAmount && cashSent > 0 ? (
+                    // Sent part of a cash wish: let someone else send the rest.
+                    <Button size="sm" variant="secondary" loading={claim.pending} onClick={async () => {
+                      if ((await claim.run(it.id, "partial")) !== undefined) { toast({ tone: "success", title: "Marked partly fulfilled", body: `Others can now send the remaining ${fmt(cashLeft!)}. Thank you!` }); reload(); }
+                    }}>Mark partly fulfilled</Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" loading={claim.pending} onClick={async () => {
+                      if ((await claim.run(it.id, "complete")) !== undefined) { toast({ tone: "success", title: "Marked completed", body: `${data.owner.firstName} will be asked to confirm.` }); reload(); }
+                    }}>Mark completed</Button>
+                  )}
                   <Button size="sm" variant="ghost" disabled={claim.pending} onClick={async () => {
                     if ((await claim.run(it.id, "release")) !== undefined) { toast({ tone: "info", title: "Wish released", body: "Someone else can gift it now." }); reload(); }
                   }}>Let someone else</Button>

@@ -12,6 +12,8 @@ import { PaymentSheet } from "@/components/payment-sheet";
 export type SharedWish = {
   id: string; kind: "Catalog" | "Custom" | "Cash"; name: string; notes: string; quantity: number; fulfilled: boolean; category: string; categoryId: string | null;
   url: string | null; imageUrl: string | null; estimatedPriceUsd: number | null; cashAmountUsd: number | null;
+  /** Cash wishes can be shared: what's been sent so far, what's left, and whether someone sent part of it and let others finish. */
+  cashRaisedUsd?: number | null; cashRemainingUsd?: number | null; partial?: boolean;
   /** One sender per wish. state: Open, Taken (someone else is fulfilling it) or Fulfilled; mine: you hold it, and status says how far it is
    * (Claimed → SenderCompleted → RecipientConfirmed → Confirmed). */
   claim?: { state: "Open" | "Taken" | "Fulfilled"; mine: boolean; status: string | null };
@@ -103,7 +105,8 @@ export function SendCashModal({ token, wish, ownerName, onClose }: { token: stri
   const { fmt } = useSession();
   const money = useMoneyInput();
   const toast = useToast();
-  const [form, setForm] = useState({ amount: money.show(wish?.cashAmountUsd ?? 20), message: "", reveal: false });
+  // Suggest what's still needed; they can send less and leave the rest to others.
+  const [form, setForm] = useState({ amount: money.show(wish?.cashRemainingUsd ?? wish?.cashAmountUsd ?? 20), message: "", reveal: false });
   const [gift, setGift] = useState<CashGift | null>(null);
   const create = useMutation(() =>
     api<CashGift>("/sender/cash-gifts", {
@@ -136,7 +139,16 @@ export function SendCashModal({ token, wish, ownerName, onClose }: { token: stri
       }
     >
       <div className="grid gap-4">
-        <Field label={`Amount (${money.symbol})`} hint={wish?.cashAmountUsd ? `${ownerName} asked for ${fmt(wish.cashAmountUsd)}.` : undefined}>
+        <Field
+          label={`Amount (${money.symbol})`}
+          hint={
+            wish?.cashAmountUsd
+              ? wish.cashRaisedUsd
+                ? `${ownerName} asked for ${fmt(wish.cashAmountUsd)}; ${fmt(wish.cashRaisedUsd)} has been sent, so ${fmt(wish.cashRemainingUsd ?? 0)} is still needed. You can send part of it.`
+                : `${ownerName} asked for ${fmt(wish.cashAmountUsd)}. You can send part of it and let others add the rest.`
+              : undefined
+          }
+        >
           {(id, d) => <Input id={id} aria-describedby={d} inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d.]/g, "") })} />}
         </Field>
         <Field label="Message (optional)">{(id) => <Textarea id={id} maxLength={300} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />}</Field>
