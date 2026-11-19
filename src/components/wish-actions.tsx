@@ -26,7 +26,8 @@ function useMoneyInput() {
   const fx = rate(currency);
   return {
     symbol: currencySymbol(currency),
-    show: (usd: number | null | undefined) => (usd == null ? "" : String(Math.round(usd * fx))),
+    // Whole units when they're whole, otherwise to the cent (so $0.09 doesn't show as 0).
+    show: (usd: number | null | undefined) => (usd == null ? "" : String(Math.round(usd * fx * 100) / 100)),
     toUsd: (v: string) => Math.round((Number(v || 0) / fx) * 100) / 100,
   };
 }
@@ -106,12 +107,15 @@ export function SendCashModal({ token, wish, ownerName, onClose }: { token: stri
   const money = useMoneyInput();
   const toast = useToast();
   // Suggest what's still needed; they can send less and leave the rest to others.
-  const [form, setForm] = useState({ amount: money.show(wish?.cashRemainingUsd ?? wish?.cashAmountUsd ?? 20), message: "", reveal: false });
+  const rest = wish?.cashRemainingUsd ?? null;
+  const [form, setForm] = useState({ amount: money.show(rest ?? wish?.cashAmountUsd ?? 20), message: "", reveal: false });
+  // Sending exactly what's left goes as the exact dollar amount, so converting from naira can't leave a few cents unpaid.
+  const sendingRest = rest != null && rest > 0 && form.amount === money.show(rest);
   const [gift, setGift] = useState<CashGift | null>(null);
   const create = useMutation(() =>
     api<CashGift>("/sender/cash-gifts", {
       method: "POST",
-      body: { wishlistToken: token, wishlistItemId: wish?.id ?? null, amountUsd: money.toUsd(form.amount), message: form.message, revealSender: form.reveal },
+      body: { wishlistToken: token, wishlistItemId: wish?.id ?? null, amountUsd: sendingRest ? rest : money.toUsd(form.amount), message: form.message, revealSender: form.reveal },
     }),
   );
   if (gift)
@@ -151,6 +155,11 @@ export function SendCashModal({ token, wish, ownerName, onClose }: { token: stri
         >
           {(id, d) => <Input id={id} aria-describedby={d} inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d.]/g, "") })} />}
         </Field>
+        {rest != null && rest > 0 && !sendingRest && (
+          <button type="button" className="-mt-2 justify-self-start text-xs font-semibold text-plum-700 hover:underline" onClick={() => setForm({ ...form, amount: money.show(rest) })}>
+            Send the rest ({fmt(rest)})
+          </button>
+        )}
         <Field label="Message (optional)">{(id) => <Textarea id={id} maxLength={300} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />}</Field>
         <Switch checked={form.reveal} onChange={(v) => setForm({ ...form, reveal: v })} label="Tell them it's from me" description="Otherwise it arrives from “a secret admirer”." />
         <p className="text-xs text-ink-500">A small SecretWish fee is added at payment; {ownerName} receives the full amount.</p>
