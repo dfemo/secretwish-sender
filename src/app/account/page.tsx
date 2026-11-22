@@ -6,7 +6,7 @@ import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
 import { PageHeader, Skeleton } from "@/shared/ui/primitives";
 import { BillingToggle, parsePlanCode, PlanButton, PricingCards, usePlanChoice, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
-import { NotificationPreferences, SupportCenter } from "@/shared/ui/account";
+import { NotificationPreferences, ProfileDetails, SupportCenter } from "@/shared/ui/account";
 import { useToast } from "@/shared/ui/overlay";
 
 type Me = { name: string; email: string; city: string; plan: string; planPaidUntil?: string | null; usedFreeSample: boolean };
@@ -65,7 +65,8 @@ export default function AccountPage() {
         )}
         {change.error && <p role="alert" className="mt-4 text-center text-sm text-danger-700">{change.error.message}</p>}
       </section>
-      <div className="mb-10">
+      <div className="mb-10 grid gap-6 lg:grid-cols-2">
+        <ProfileDetails description="How VeilWish (SecretWish) reaches you, and where gifts sent to you are delivered. Your date of birth lets us send you birthday wishes." />
         <NotificationPreferences showWishlist={false} />
       </div>
       <h2 id="support" className="mb-4 scroll-mt-24 font-display text-2xl font-semibold text-plum-900">
