@@ -8,6 +8,7 @@ import { useApi, type Paged } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date } from "@/shared/lib/format";
 import { ButtonLink, Card, ErrorState, PageSkeleton, ProductArt, StatusBadge, cx, useGreeting } from "@/shared/ui/primitives";
+import { PlanSummaryCard } from "@/shared/ui/pricing";
 import { ProductCard } from "@/components/product-card";
 import { WishlistTile } from "@/components/wishlist-tile";
 import { recentlyViewed, type Product, type WishlistCard } from "@/lib/types";
@@ -77,6 +78,8 @@ export default function SenderHome() {
           <p className="mt-6 inline-block rounded-xl bg-gold-500/15 px-3 py-2 text-xs text-gold-300">Your first gift up to {fmt(meta?.freeSampleLimitUsd ?? 100)} is free of SecretWish fees.</p>
         )}
       </section>
+
+      <PlanSummaryCard audience="customer" manageHref="/account#plan-h" />
 
       {data.activeOrders.length > 0 && (
         <section aria-labelledby="active-h">

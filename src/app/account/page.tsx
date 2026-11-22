@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useApi, type Paged } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
-import { date } from "@/shared/lib/format";
 import { PageHeader, Skeleton } from "@/shared/ui/primitives";
-import { BillingToggle, parsePlanCode, PlanButton, PricingCards, usePlanChoice, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
+import { BillingToggle, parsePlanCode, PlanButton, PlanSummaryCard, PricingCards, usePlanChoice, usePlanSummary, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
 import { NotificationPreferences, ProfileDetails, SupportCenter } from "@/shared/ui/account";
 import { useToast } from "@/shared/ui/overlay";
 
@@ -23,10 +22,12 @@ export default function AccountPage() {
   useEffect(() => { const b = parsePlanCode(me?.plan).billing; if (b) setBilling(b); }, [me?.plan]);
   const toast = useToast();
   const change = usePlanChoice("customer");
+  const summary = usePlanSummary("customer");
 
   return (
     <>
       <PageHeader title="Account" description={me ? `${me.name} · ${me.email}` : undefined} />
+      <PlanSummaryCard audience="customer" manageHref="#plan-h" className="mb-6" />
       <section aria-labelledby="plan-h" className="mb-8 rounded-[32px] bg-[linear-gradient(135deg,#f3eef7_0%,#fbf6e8_100%)] p-4 sm:p-6 md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -35,7 +36,6 @@ export default function AccountPage() {
             </h2>
             <p className="mt-1 text-sm text-ink-500">
               Prices are set in USD and shown in your currency. Paid plans are paid securely with our payment partner.
-              {me?.planPaidUntil && <> Paid until {date(me.planPaidUntil)}.</>}
               {me && <> Free first gift: {me.usedFreeSample ? "used" : "available"}.</>}
             </p>
           </div>
@@ -50,13 +50,14 @@ export default function AccountPage() {
             action={(p, { current, code }) => (
               <PlanButton
                 plan={p}
-                disabled={current || change.pending}
+                disabled={(current && p.isFree) || change.pending || !!summary.data?.blocked[code]}
+                title={summary.data?.blocked[code]}
                 onClick={async () => {
                   const r = await change.choose(code, p.isFree);
                   if (r?.switched) toast({ tone: "success", title: `Switched to ${p.name}` });
                 }}
               >
-                {current ? "Your plan" : p.isFree ? "Switch to Free" : `Pay for ${p.name}`}
+                {current ? (p.isFree ? "Your plan" : `Renew ${p.name}`) : summary.data?.blocked[code] ? "Available after your plan ends" : p.isFree ? "Switch to Free" : `Pay for ${p.name}`}
               </PlanButton>
             )}
           />
