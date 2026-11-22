@@ -79,7 +79,7 @@ export default function SenderHome() {
         )}
       </section>
 
-      <PlanSummaryCard audience="customer" manageHref="/account#plan-h" />
+      <PlanSummaryCard audience="customer" manageHref="/account?plans=1" />
 
       {data.activeOrders.length > 0 && (
         <section aria-labelledby="active-h">
