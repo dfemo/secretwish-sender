@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, useApi, useMutation, type Paged } from "@/shared/lib/api";
+import { useApi, type Paged } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
-import { Badge, PageHeader, Skeleton } from "@/shared/ui/primitives";
-import { BillingToggle, parsePlanCode, PlanButton, PricingCards, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
+import { date } from "@/shared/lib/format";
+import { PageHeader, Skeleton } from "@/shared/ui/primitives";
+import { BillingToggle, parsePlanCode, PlanButton, PricingCards, usePlanChoice, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
 import { NotificationPreferences, SupportCenter } from "@/shared/ui/account";
 import { useToast } from "@/shared/ui/overlay";
 
-type Me = { name: string; email: string; city: string; plan: string; usedFreeSample: boolean };
+type Me = { name: string; email: string; city: string; plan: string; planPaidUntil?: string | null; usedFreeSample: boolean };
 type Order = { id: string; reference: string; product: string };
 
 export default function AccountPage() {
@@ -21,7 +22,7 @@ export default function AccountPage() {
   // Open on the period the person pays for.
   useEffect(() => { const b = parsePlanCode(me?.plan).billing; if (b) setBilling(b); }, [me?.plan]);
   const toast = useToast();
-  const change = useMutation((plan: string) => api("/sender/plan", { method: "POST", body: { plan } }));
+  const change = usePlanChoice("customer");
 
   return (
     <>
@@ -30,10 +31,11 @@ export default function AccountPage() {
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 id="plan-h" className="flex items-center gap-2 font-display text-3xl font-semibold text-plum-900">
-              Your plan <Badge tone="gold">Simulated billing</Badge>
+              Your plan
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              Prices are set in USD and shown in your currency.
+              Prices are set in USD and shown in your currency. Paid plans are paid securely with our payment partner.
+              {me?.planPaidUntil && <> Paid until {date(me.planPaidUntil)}.</>}
               {me && <> Free first gift: {me.usedFreeSample ? "used" : "available"}.</>}
             </p>
           </div>
@@ -50,10 +52,11 @@ export default function AccountPage() {
                 plan={p}
                 disabled={current || change.pending}
                 onClick={async () => {
-                  if ((await change.run(code)) !== undefined) toast({ tone: "success", title: `Switched to ${p.name}${p.isFree ? "" : billing === "Yearly" ? ", billed yearly" : ", billed monthly"} (simulated)` });
+                  const r = await change.choose(code, p.isFree);
+                  if (r?.switched) toast({ tone: "success", title: `Switched to ${p.name}` });
                 }}
               >
-                {current ? "Your plan" : p.isFree ? "Switch to Free" : `Choose ${p.name}`}
+                {current ? "Your plan" : p.isFree ? "Switch to Free" : `Pay for ${p.name}`}
               </PlanButton>
             )}
           />

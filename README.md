@@ -24,7 +24,7 @@ Start the API first (`dotnet run --project ../Backend/src/SecretWish.Api --launc
 | Checkout (6 steps) | Review gift (qty, personalisation, optional budget range) → recipient & delivery → message → privacy choices → payment method → review; simulated payment success/decline; confirmation |
 | My gifts / tracking | Timeline of real events with next steps; complete a failed payment; cancel or report a problem |
 | Surprise requests | Create a brief with a budget range; compare vendor quotes (out-of-range quotes flagged); check out a quote |
-| Account | Plan (free first gift ≤ $100, monthly/yearly — simulated), discreet notifications, support |
+| Account | Plan (free first gift ≤ $100, monthly/yearly — paid with the default payment engine), discreet notifications, support |
 
 Demo persona with the richest data: **Femi Adeyemi**.
 

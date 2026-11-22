@@ -10,6 +10,7 @@ import { date } from "@/shared/lib/format";
 import { Badge, Button, ButtonLink, Card, cx, ErrorState, Field, Input, Notice, PageSkeleton, ProductArt, Select, Switch, Textarea } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
 import { PaymentSheet } from "@/components/payment-sheet";
+import { usePlanChoice, type PlanCatalog } from "@/shared/ui/pricing";
 import type { Product } from "@/lib/types";
 
 type Pricing = { unit: number; qty: number; subtotal: number; deliveryFee: number; discount: number; tax: number; total: number; freeSample: boolean; planRequired: boolean; promoMessage?: string };
@@ -51,7 +52,26 @@ function CheckoutInner() {
   const [order, setOrder] = useState<{ id: string; reference: string; total: number } | null>(null);
   const [paid, setPaid] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [planVersion, setPlanVersion] = useState(0);
+  const plans = useApi<PlanCatalog>("/plans/customer");
+  const planChoice = usePlanChoice("customer");
+  // What's been filled in survives the trip to the payment engine's checkout for a plan (kept in this tab only).
+  const draftKey = `secretwish.checkout.${params.toString()}`;
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(draftKey);
+      if (!saved) return;
+      sessionStorage.removeItem(draftKey);
+      const d = JSON.parse(saved) as { f: typeof f; step: number };
+      setF((x) => ({ ...x, ...d.f }));
+      setStep(d.step);
+    } catch { /* storage blocked: start fresh */ }
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const payForPlan = async (code: string) => {
+    try { sessionStorage.setItem(draftKey, JSON.stringify({ f, step })); } catch { /* storage blocked */ }
+    await planChoice.choose(code, false);
+  };
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
 
   useEffect(() => {
@@ -74,9 +94,8 @@ function CheckoutInner() {
         .catch(() => {});
     }, 200);
     return () => clearTimeout(t);
-  }, [productId, quoteId, f.quantity, f.deliveryOption, f.promoCode, planVersion]);
+  }, [productId, quoteId, f.quantity, f.deliveryOption, f.promoCode]);
 
-  const activatePlan = useMutation((plan: string) => api("/sender/plan", { method: "POST", body: { plan } }));
   const create = useMutation(() =>
     api<{ id: string; reference: string; total: number }>("/sender/orders", {
       method: "POST",
@@ -396,16 +415,24 @@ function CheckoutInner() {
                 ))}
               </dl>
               {pricing?.planRequired && (
-                <Notice tone="warning" title="A SecretWish plan is needed for this gift">
-                  Your free first gift has been used (or this gift is over {fmt(meta?.freeSampleLimitUsd ?? 100)}). Plan prices are still being finalised.
-                  <div className="mt-2 flex gap-2">
-                    <Button size="sm" loading={activatePlan.pending} onClick={async () => { if ((await activatePlan.run("Customer Monthly")) !== undefined) { toast({ tone: "success", title: "Monthly plan activated (simulated)" }); setPlanVersion((v) => v + 1); } }}>
-                      Activate monthly (simulated)
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={async () => { if ((await activatePlan.run("Customer Yearly")) !== undefined) { toast({ tone: "success", title: "Yearly plan activated (simulated)" }); setPlanVersion((v) => v + 1); } }}>
-                      Yearly (reduced price)
-                    </Button>
+                <Notice tone="warning" title="A VeilWish (SecretWish) plan is needed for this gift">
+                  Your free first gift has been used (or this gift is over {fmt(meta?.freeSampleLimitUsd ?? 100)}). Pay for a plan with our payment partner; you&apos;ll come
+                  straight back here to finish your gift.
+                  <div className="mt-3 grid gap-2">
+                    {plans.data?.plans.filter((pl) => pl.active && !pl.isFree).map((pl) => (
+                      <div key={pl.id} className="flex flex-wrap items-center gap-2">
+                        <span className="min-w-[90px] font-semibold">{pl.name}</span>
+                        <Button size="sm" loading={planChoice.pending} onClick={() => payForPlan(`${pl.key} Monthly`)}>
+                          {fmt(pl.monthlyPriceUsd)} / month
+                        </Button>
+                        <Button size="sm" variant="secondary" disabled={planChoice.pending} onClick={() => payForPlan(`${pl.key} Yearly`)}>
+                          {fmt(pl.yearlyPriceUsd)} / year
+                        </Button>
+                      </div>
+                    ))}
+                    {plans.data && !plans.data.plans.some((pl) => pl.active && !pl.isFree) && <p>No paid plans are offered right now. Please contact support.</p>}
                   </div>
+                  {planChoice.error && <p role="alert" className="mt-2 text-danger-700">{planChoice.error.message}</p>}
                 </Notice>
               )}
               {create.error && <Notice tone="danger">{create.error.message}</Notice>}
